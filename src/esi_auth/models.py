@@ -10,6 +10,18 @@ from pydantic import BaseModel, Field
 from whenever import Instant
 
 
+def _get_current_instant() -> Instant:
+    """Factory function to get current instant for default values.
+
+    This function is used as a default_factory to avoid circular dependencies
+    that can occur when using Instant.now directly in field definitions.
+
+    Returns:
+        Current instant in time.
+    """
+    return Instant.now()
+
+
 class CharacterToken(BaseModel):
     """Represents an authenticated character's token data.
 
@@ -27,10 +39,10 @@ class CharacterToken(BaseModel):
     )
     token_type: str = Field(default="Bearer", description="Type of token")
     created_at: Instant = Field(
-        default_factory=Instant.now, description="When token was first created"
+        default_factory=_get_current_instant, description="When token was first created"
     )
     updated_at: Instant = Field(
-        default_factory=Instant.now, description="When token was last updated"
+        default_factory=_get_current_instant, description="When token was last updated"
     )
 
     def is_expired(self) -> bool:
@@ -62,16 +74,18 @@ class AuthenticatedCharacters(BaseModel):
     """
 
     characters: dict[int, CharacterToken] = Field(
-        default_factory=dict,
+        default_factory=dict[int, CharacterToken],
         description="Dictionary mapping character_id to CharacterToken",
     )
     last_updated: Instant = Field(
-        default_factory=Instant.now,
+        default_factory=_get_current_instant,
         description="When this collection was last modified",
     )
 
     def add_character(self, token: CharacterToken) -> None:
         """Add or update a character's token data.
+
+        Updates the last_updated timestamp to reflect the modification.
 
         Args:
             token: The CharacterToken to add or update.
@@ -81,6 +95,8 @@ class AuthenticatedCharacters(BaseModel):
 
     def remove_character(self, character_id: int) -> bool:
         """Remove a character from the collection.
+
+        Updates the last_updated timestamp if a character was removed.
 
         Args:
             character_id: The character ID to remove.
@@ -95,23 +111,34 @@ class AuthenticatedCharacters(BaseModel):
         return False
 
     def get_character(self, character_id: int) -> CharacterToken | None:
-        """Get a character's token data.
+        """Retrieve a character's token data.
 
         Args:
             character_id: The character ID to retrieve.
 
         Returns:
-            The CharacterToken if found, None otherwise.
+            CharacterToken if found, None otherwise.
         """
         return self.characters.get(character_id)
 
     def list_characters(self) -> list[CharacterToken]:
-        """Get a list of all character tokens.
+        """Get a list of all authenticated characters.
 
         Returns:
-            List of all CharacterToken objects.
+            List of all CharacterToken instances in the collection.
         """
         return list(self.characters.values())
+
+    def has_character(self, character_id: int) -> bool:
+        """Check if a character exists in the collection.
+
+        Args:
+            character_id: The character ID to check.
+
+        Returns:
+            True if character exists, False otherwise.
+        """
+        return character_id in self.characters
 
     def get_expired_tokens(self) -> list[CharacterToken]:
         """Get list of characters with expired tokens.

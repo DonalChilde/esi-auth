@@ -3,20 +3,18 @@ name = "esi-auth"
 version = "0.1.0"
 description = "A simple Eve Online authentication library"
 readme = "README.md"
-authors = [
-    { name = "Chad Lowe", email = "pfmsoft.dev@gmail.com" }
-]
+authors = [{ name = "Chad Lowe", email = "pfmsoft.dev@gmail.com" }]
 requires-python = ">=3.13"
 dependencies = [
-    "aiohttp>=3.12.15",
-    "jinja2>=3.1.6",
-    "pydantic>=2.11.9",
-    "pydantic-settings>=2.10.1",
-    "typer>=0.17.4",
-    "whenever>=0.8.8",
+  "aiohttp>=3.12.15",
+  "jinja2>=3.1.6",
+  "pydantic>=2.11.9",
+  "pydantic-settings>=2.10.1",
+  "typer>=0.17.4",
+  "whenever>=0.8.8",
 ]
 license = "MIT"
-license-files=["LICENSE"]
+license-files = ["LICENSE"]
 
 [project.scripts]
 esi-auth = "esi_auth.cli.main_typer:app"
@@ -30,15 +28,20 @@ build-backend = "uv_build"
 # https://docs.astral.sh/uv/concepts/projects/dependencies/#development-dependencies
 # https://docs.astral.sh/uv/concepts/projects/dependencies/#dependency-groups
 dev = [
-  {include-group = "lint"},
-  {include-group = "test"},
+  { include-group = "lint" },
+  { include-group = "test" },
   "pytest>=8.4.2",
   "pytest-cov>=7.0.0",
   "ruff>=0.13.1",
   "scriv>=1.7.0",
 ]
-lint = []
-test = []
+lint = ["ruff>=0.13.1"]
+test = [
+  "pytest>=8.4.2",
+  "pytest-asyncio>=0.21.0",
+  "pytest-cov>=4.0.0",
+  "rich>=13.0.0",
+]
 
 # Documentation building dependencies like Sphinx
 doc = []

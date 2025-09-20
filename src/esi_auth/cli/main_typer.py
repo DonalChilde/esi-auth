@@ -69,7 +69,7 @@ def main(
 @app.command()
 def auth(
     scopes: Annotated[
-        list[str],
+        list[str] | None,
         typer.Option(
             "--scope", "-s", help="ESI scope to request (can be used multiple times)"
         ),
@@ -99,13 +99,13 @@ def auth(
 
     except AuthenticationError as e:
         console.print(f"[red]Authentication failed:[/red] {e}")
-        raise typer.Exit(1)
+        raise typer.Exit(1) from e
     except TokenStorageError as e:
         console.print(f"[red]Failed to save token:[/red] {e}")
-        raise typer.Exit(1)
+        raise typer.Exit(1) from e
     except Exception as e:
         console.print(f"[red]Unexpected error:[/red] {e}")
-        raise typer.Exit(1)
+        raise typer.Exit(1) from e
 
 
 @app.command()
@@ -158,7 +158,7 @@ def list() -> None:
 
     except TokenStorageError as e:
         console.print(f"[red]Failed to load characters:[/red] {e}")
-        raise typer.Exit(1)
+        raise typer.Exit(1) from e
 
 
 @app.command()
@@ -237,13 +237,13 @@ def refresh(
 
     except TokenRefreshError as e:
         console.print(f"[red]Token refresh failed:[/red] {e}")
-        raise typer.Exit(1)
+        raise typer.Exit(1) from e
     except TokenStorageError as e:
         console.print(f"[red]Storage error:[/red] {e}")
-        raise typer.Exit(1)
+        raise typer.Exit(1) from e
     except Exception as e:
         console.print(f"[red]Unexpected error:[/red] {e}")
-        raise typer.Exit(1)
+        raise typer.Exit(1) from e
 
 
 @app.command()
@@ -281,10 +281,10 @@ def remove(
 
     except TokenStorageError as e:
         console.print(f"[red]Storage error:[/red] {e}")
-        raise typer.Exit(1)
+        raise typer.Exit(1) from e
     except Exception as e:
         console.print(f"[red]Unexpected error:[/red] {e}")
-        raise typer.Exit(1)
+        raise typer.Exit(1) from e
 
 
 @app.command()
@@ -335,10 +335,10 @@ def validate(
 
     except TokenStorageError as e:
         console.print(f"[red]Storage error:[/red] {e}")
-        raise typer.Exit(1)
+        raise typer.Exit(1) from e
     except Exception as e:
         console.print(f"[red]Unexpected error:[/red] {e}")
-        raise typer.Exit(1)
+        raise typer.Exit(1) from e
 
 
 @app.command()
@@ -388,13 +388,13 @@ def info(
         console.print(
             "[yellow]Tip:[/yellow] Try refreshing the token with '[bold]esi-auth refresh {character_id}[/bold]'"
         )
-        raise typer.Exit(1)
+        raise typer.Exit(1) from e
     except TokenStorageError as e:
         console.print(f"[red]Storage error:[/red] {e}")
-        raise typer.Exit(1)
+        raise typer.Exit(1) from e
     except Exception as e:
         console.print(f"[red]Unexpected error:[/red] {e}")
-        raise typer.Exit(1)
+        raise typer.Exit(1) from e
 
 
 @app.command()
@@ -410,10 +410,10 @@ def backup(
 
     except TokenStorageError as e:
         console.print(f"[red]Backup failed:[/red] {e}")
-        raise typer.Exit(1)
+        raise typer.Exit(1) from e
     except Exception as e:
         console.print(f"[red]Unexpected error:[/red] {e}")
-        raise typer.Exit(1)
+        raise typer.Exit(1) from e
 
 
 @app.command()
@@ -453,10 +453,10 @@ def restore(
 
     except TokenStorageError as e:
         console.print(f"[red]Restore failed:[/red] {e}")
-        raise typer.Exit(1)
+        raise typer.Exit(1) from e
     except Exception as e:
         console.print(f"[red]Unexpected error:[/red] {e}")
-        raise typer.Exit(1)
+        raise typer.Exit(1) from e
 
 
 @app.command()

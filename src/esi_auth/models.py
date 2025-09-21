@@ -195,7 +195,6 @@ class CharacterInfo(BaseModel):
     gender: str = Field(..., description="Character gender")
     race_id: int = Field(..., description="Character's race ID")
     bloodline_id: int = Field(..., description="Character's bloodline ID")
-    ancestry_id: int = Field(..., description="Character's ancestry ID")
     security_status: float | None = Field(
         None, description="Character's security status"
     )

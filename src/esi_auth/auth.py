@@ -69,7 +69,7 @@ class ESIAuthenticator:
             Tuple of (authorization_url, state_value)
         """
         if scopes is None:
-            scopes = ["esi-characters.read_character.v1"]
+            scopes = ["esi-skills.read_skills.v1"]
 
         if state is None:
             state = secrets.token_urlsafe(32)
@@ -126,6 +126,7 @@ class ESIAuthenticator:
                 self.settings.token_url, headers=headers, data=data
             ) as response:
                 response_data = await response.json()
+                logger.info(f"Token exchange response: {response_data!r}")
 
                 if response.status != 200:
                     error_msg = f"Token exchange failed: {response_data.get('error_description', 'Unknown error')}"
@@ -230,6 +231,9 @@ class ESIAuthenticator:
                     raise AuthenticationError(error_msg)
 
                 verify_data = await response.json()
+                logger.info(
+                    f"Token verified for character ID {verify_data['CharacterID']} {verify_data!r}"
+                )
                 character_id = verify_data["CharacterID"]
                 character_name = verify_data["CharacterName"]
 
@@ -248,6 +252,7 @@ class ESIAuthenticator:
                     raise AuthenticationError(error_msg)
 
                 char_data = await response.json()
+                logger.info(f"Retrieved character info: {char_data!r}")
                 char_data["character_id"] = (
                     character_id  # Add the character_id to the data
                 )
@@ -394,6 +399,7 @@ class ESIAuthenticator:
                 )
 
             # Get authorization code
+            logger.info(f"Received OAuth callback: {request.query!r}")
             authorization_code = request.query.get("code")
             if not authorization_code:
                 error_message = "No authorization code received"

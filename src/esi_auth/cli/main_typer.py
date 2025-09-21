@@ -81,7 +81,7 @@ def auth(
     resulting token for future use.
     """
     if scopes is None:
-        scopes = ["esi-characters.read_character.v1"]
+        scopes = ["esi-skills.read_skills.v1"]
 
     console.print(
         f"[blue]Starting authentication for scopes:[/blue] {', '.join(scopes)}"

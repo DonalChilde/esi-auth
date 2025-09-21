@@ -45,9 +45,10 @@ class ESIAuthenticator:
 
     async def __aenter__(self) -> "ESIAuthenticator":
         """Async context manager entry."""
-        self.client_session = aiohttp.ClientSession(
-            timeout=aiohttp.ClientTimeout(total=self.settings.request_timeout)
-        )
+        if self.client_session is None:
+            self.client_session = aiohttp.ClientSession(
+                timeout=aiohttp.ClientTimeout(total=self.settings.request_timeout)
+            )
         return self
 
     async def __aexit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:

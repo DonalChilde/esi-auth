@@ -30,11 +30,11 @@ class ESIAuthSettings(BaseSettings):
 
     # OAuth2 credentials
     client_id: str = Field(
-        ...,
+        default="NOT_SET",
         description="EVE Online application client ID from developers.eveonline.com",
     )
     client_secret: str = Field(
-        ...,
+        default="NOT_SET",
         description="EVE Online application client secret from developers.eveonline.com",
     )
 
@@ -47,6 +47,11 @@ class ESIAuthSettings(BaseSettings):
     app_dir: Path = Field(
         default_factory=lambda: Path(typer.get_app_dir("pfmsoft-esi-auth")),
         description="Directory for storing application data",
+    )
+
+    log_dir: Path = Field(
+        default_factory=lambda: Path(typer.get_app_dir("pfmsoft-esi-auth")) / "logs",
+        description="Directory for storing log files",
     )
 
     # ESI API configuration

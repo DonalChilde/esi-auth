@@ -22,6 +22,37 @@ def _get_current_instant() -> Instant:
     return Instant.now()
 
 
+class VerifiedToken(BaseModel):
+    """Represents a verified character token.
+
+    This model stores information about a character token that has been
+    verified for validity and scope.
+    """
+
+    character_id: int = Field(
+        ..., description="The EVE character ID", alias="CharacterID"
+    )
+    character_name: str = Field(
+        ..., description="The character's name", alias="CharacterName"
+    )
+    expires_on: Instant = Field(
+        ..., description="When the token expires", alias="ExpiresOn"
+    )
+    scopes: list[str] = Field(
+        default_factory=list, description="List of authorized scopes", alias="Scopes"
+    )
+    token_type: str = Field(..., description="Type of token", alias="TokenType")
+    character_owner_hash: str = Field(
+        ..., description="Hash of the token owner", alias="CharacterOwnerHash"
+    )
+    client_id: str = Field(
+        ..., description="Client ID associated with the token", alias="ClientID"
+    )
+    verified_at: Instant = Field(
+        default_factory=_get_current_instant, description="When the token was verified"
+    )
+
+
 class CharacterToken(BaseModel):
     """Represents an authenticated character's token data.
 

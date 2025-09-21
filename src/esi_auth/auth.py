@@ -13,7 +13,7 @@ from typing import Any
 
 import aiohttp
 from aiohttp import web
-from whenever import Instant
+from whenever import Instant, PlainDateTime
 
 from .models import (
     AuthenticationError,
@@ -21,6 +21,7 @@ from .models import (
     CharacterToken,
     ESIAuthenticationResponse,
     TokenRefreshError,
+    VerifiedToken,
 )
 from .settings import get_settings
 
@@ -187,7 +188,7 @@ class ESIAuthenticator:
                     error_msg = f"Token refresh failed: {response_data.get('error_description', 'Unknown error')}"
                     logger.error(f"{error_msg} (status: {response.status})")
                     raise TokenRefreshError(error_msg, 0, response_data.get("error"))
-
+                logger.info(f"Token refresh response: {response_data!r}")
                 logger.info("Successfully refreshed token")
                 return ESIAuthenticationResponse.model_validate(response_data)
 
@@ -199,6 +200,43 @@ class ESIAuthenticator:
             error_msg = f"Unexpected error during token refresh: {e}"
             logger.error(error_msg)
             raise TokenRefreshError(error_msg, 0) from e
+
+    async def verify_token(self, access_token: str) -> VerifiedToken:
+        """Verify an access token using ESI /verify/ endpoint.
+
+        Args:
+            access_token: The access token to verify.
+        Returns:
+            Dictionary with verification data.
+        """
+        if not self.client_session:
+            raise AuthenticationError("Client session not initialized")
+        headers = {
+            "Authorization": f"Bearer {access_token}",
+            "User-Agent": f"{self.settings.app_name}/1.0",
+        }
+        try:
+            verify_url = f"{self.settings.esi_base_url}/verify/"
+            logger.debug("Verifying token")
+            async with self.client_session.get(verify_url, headers=headers) as response:
+                response_data = await response.json()
+                if response.status != 200:
+                    error_msg = f"Token verification failed: {response_data.get('error_description', 'Unknown error')}"
+                    logger.error(f"{error_msg} (status: {response.status})")
+                    raise AuthenticationError(error_msg)
+                logger.info(f"Token verification response: {response_data!r}")
+                logger.info("Successfully verified token")
+                response_data["ExpiresOn"] = PlainDateTime.parse_common_iso(
+                    response_data["ExpiresOn"]
+                ).assume_utc()
+                response_data["Scopes"] = response_data["Scopes"].split(" ")
+                verified_token = VerifiedToken.model_validate(response_data)
+                logger.info(f"Verified token: {verified_token!r}")
+                return verified_token
+        except Exception as e:
+            error_msg = f"Unexpected error during token verification: {e}"
+            logger.error(error_msg)
+            raise AuthenticationError(error_msg) from e
 
     async def get_character_info(self, access_token: str) -> CharacterInfo:
         """Get character information from ESI using access token.
@@ -215,33 +253,14 @@ class ESIAuthenticator:
         if not self.client_session:
             raise AuthenticationError("Client session not initialized")
 
-        headers = {
-            "Authorization": f"Bearer {access_token}",
-            "User-Agent": f"{self.settings.app_name}/1.0",
-        }
-
         try:
             # First, verify the token and get character ID
-            verify_url = f"{self.settings.esi_base_url}/verify/"
-            logger.debug("Verifying token and getting character ID")
-
-            async with self.client_session.get(verify_url, headers=headers) as response:
-                if response.status != 200:
-                    error_msg = f"Token verification failed (status: {response.status})"
-                    logger.error(error_msg)
-                    raise AuthenticationError(error_msg)
-
-                verify_data = await response.json()
-                logger.info(
-                    f"Token verified for character ID {verify_data['CharacterID']} {verify_data!r}"
-                )
-                character_id = verify_data["CharacterID"]
-                character_name = verify_data["CharacterName"]
+            verified_token = await self.verify_token(access_token)
 
             # Get detailed character information
-            char_url = f"{self.settings.esi_base_url}/latest/characters/{character_id}/"
+            char_url = f"{self.settings.esi_base_url}/latest/characters/{verified_token.character_id}/"
             logger.debug(
-                f"Getting character info for {character_name} ({character_id})"
+                f"Getting character info for {verified_token.character_name} ({verified_token.character_id})"
             )
 
             async with self.client_session.get(char_url) as response:
@@ -255,10 +274,12 @@ class ESIAuthenticator:
                 char_data = await response.json()
                 logger.info(f"Retrieved character info: {char_data!r}")
                 char_data["character_id"] = (
-                    character_id  # Add the character_id to the data
+                    verified_token.character_id  # Add the character_id to the data
                 )
 
-                logger.info(f"Retrieved character info for {character_name}")
+                logger.info(
+                    f"Retrieved character info for {verified_token.character_name}"
+                )
                 return CharacterInfo.model_validate(char_data)
 
         except aiohttp.ClientError as e:
@@ -295,11 +316,13 @@ class ESIAuthenticator:
 
         # Exchange code for token
         token_response = await self.exchange_code_for_token(authorization_code)
+        logger.info(f"Token exchange response: {token_response!r}")
 
         # Get character information
         character_info = await self.get_character_info(token_response.access_token)
 
         # Create CharacterToken
+        # TODO change this to use token_response time plus expires_in? check returns for token_response
         expires_at = Instant.now().add(seconds=token_response.expires_in)
 
         character_token = CharacterToken(
@@ -335,6 +358,7 @@ class ESIAuthenticator:
             token_response = await self.refresh_token(character_token.refresh_token)
 
             # Update the character token with new data
+            # TODO change this to use refresh time plus expires_in? check returns for refresh_token
             expires_at = Instant.now().add(seconds=token_response.expires_in)
 
             character_token.access_token = token_response.access_token

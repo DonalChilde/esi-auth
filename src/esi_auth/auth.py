@@ -27,6 +27,9 @@ from .settings import get_settings
 
 logger = logging.getLogger(__name__)
 
+# TODO auth metadata retrieval and update settings.
+# TODO make better user agent.
+
 
 class ESIAuthenticator:
     """Handles EVE Online ESI OAuth2 authentication flow.
@@ -206,6 +209,7 @@ class ESIAuthenticator:
 
         Args:
             access_token: The access token to verify.
+
         Returns:
             Dictionary with verification data.
         """

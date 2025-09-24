@@ -13,8 +13,10 @@ from typing import Any
 
 import aiohttp
 from aiohttp import web
+from jwt.jwks_client import PyJWKClient
 from whenever import Instant, PlainDateTime
 
+from . import auth_helpers as AH
 from .models import (
     AuthenticationError,
     CharacterInfo,
@@ -27,8 +29,9 @@ from .settings import get_settings
 
 logger = logging.getLogger(__name__)
 
-# TODO auth metadata retrieval and update settings.
+
 # TODO make better user agent.
+USER_AGENT = "ESI-Auth/1.0"
 
 
 class ESIAuthenticator:
@@ -46,13 +49,23 @@ class ESIAuthenticator:
         """Initialize the ESI authenticator with current settings."""
         self.settings = get_settings()
         self.client_session: aiohttp.ClientSession | None = None
+        self.jwks_client: PyJWKClient | None = None  # Initialized on first use
+        self.oauth_metadata: AH.OauthMetadata | None = None  # Fetched on first use
+        self.user_agent = USER_AGENT
 
     async def __aenter__(self) -> "ESIAuthenticator":
         """Async context manager entry."""
+        # TODO test to see if this acts properly during second use as context manager
         if self.client_session is None:
             self.client_session = aiohttp.ClientSession(
                 timeout=aiohttp.ClientTimeout(total=self.settings.request_timeout)
             )
+        if self.oauth_metadata is None:
+            await self.load_oauth2_metadata()
+        if self.oauth_metadata is None:
+            raise AuthenticationError("Failed to load OAuth2 metadata")
+        if self.jwks_client is None:
+            self.jwks_client = PyJWKClient(uri=self.oauth_metadata.get("jwks_uri"))
         return self
 
     async def __aexit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
@@ -60,45 +73,48 @@ class ESIAuthenticator:
         if self.client_session:
             await self.client_session.close()
 
+    async def load_oauth2_metadata(self) -> None:
+        """Fetch and cache OAuth2 metadata from the authorization server."""
+        if not self.client_session:
+            raise AuthenticationError("Client session not initialized")
+        self.oauth_metadata = await AH.fetch_oauth_metadata(
+            self.client_session,
+            self.settings.oauth2_authorization_metadata_url,
+            user_agent=self.user_agent,
+        )
+
     def generate_auth_url(
-        self, scopes: list[str] | None = None, state: str | None = None
+        self, scopes: list[str], code_challenge: str
     ) -> tuple[str, str]:
         """Generate OAuth2 authorization URL.
 
         Args:
             scopes: List of ESI scopes to request. If None, uses basic scopes.
-            state: Optional state parameter for CSRF protection.
-                  If None, generates a random state.
+            code_challenge: PKCE code challenge for enhanced security.
 
         Returns:
             Tuple of (authorization_url, state_value)
         """
-        if scopes is None:
-            scopes = ["esi-skills.read_skills.v1"]
-
-        if state is None:
-            state = secrets.token_urlsafe(32)
-
-        params = {
-            "response_type": "code",
-            "redirect_uri": self.settings.callback_url,
-            "client_id": self.settings.client_id,
-            "scope": " ".join(scopes),
-            "state": state,
-        }
-
-        auth_url = f"{self.settings.authorize_url}?{urllib.parse.urlencode(params)}"
-        logger.debug(f"Generated auth URL for scopes: {scopes}")
-
+        if self.oauth_metadata is None:
+            raise AuthenticationError("OAuth2 metadata not loaded")
+        authorization_endpoint = self.oauth_metadata.get("authorization_endpoint")
+        auth_url, state = AH.redirect_to_sso(
+            client_id=self.settings.client_id,
+            scopes=scopes,
+            redirect_uri=self.settings.callback_url,
+            authorization_endpoint=authorization_endpoint,
+            challenge=code_challenge,
+        )
         return auth_url, state
 
     async def exchange_code_for_token(
-        self, authorization_code: str
+        self, authorization_code: str, code_verifier: str
     ) -> ESIAuthenticationResponse:
         """Exchange authorization code for access token.
 
         Args:
             authorization_code: The authorization code from OAuth callback.
+            code_verifier: The code verifier used in PKCE flow.
 
         Returns:
             ESIAuthenticationResponse with token data.
@@ -108,38 +124,19 @@ class ESIAuthenticator:
         """
         if not self.client_session:
             raise AuthenticationError("Client session not initialized")
-
-        # Prepare Basic Auth header
-        credentials = f"{self.settings.client_id}:{self.settings.client_secret}"
-        encoded_credentials = base64.b64encode(credentials.encode()).decode()
-
-        headers = {
-            "Authorization": f"Basic {encoded_credentials}",
-            "Content-Type": "application/x-www-form-urlencoded",
-            "User-Agent": f"{self.settings.app_name}/1.0",
-        }
-
-        data = {
-            "grant_type": "authorization_code",
-            "code": authorization_code,
-            "redirect_uri": self.settings.callback_url,
-        }
+        if self.oauth_metadata is None:
+            raise AuthenticationError("OAuth2 metadata not loaded")
 
         try:
-            logger.debug("Exchanging authorization code for token")
-            async with self.client_session.post(
-                self.settings.token_url, headers=headers, data=data
-            ) as response:
-                response_data = await response.json()
-                logger.info(f"Token exchange response: {response_data!r}")
-
-                if response.status != 200:
-                    error_msg = f"Token exchange failed: {response_data.get('error_description', 'Unknown error')}"
-                    logger.error(f"{error_msg} (status: {response.status})")
-                    raise AuthenticationError(error_msg, response_data.get("error"))
-
-                logger.info("Successfully exchanged code for token")
-                return ESIAuthenticationResponse.model_validate(response_data)
+            token = AH.request_token(
+                client_id=self.settings.client_id,
+                authorization_code=authorization_code,
+                code_verifier=code_verifier,
+                token_endpoint=self.oauth_metadata["token_endpoint"],
+                user_agent=self.user_agent,
+                client_session=self.client_session,
+            )
+            return ESIAuthenticationResponse.model_validate(token)
 
         except aiohttp.ClientError as e:
             error_msg = f"Network error during token exchange: {e}"
@@ -163,37 +160,20 @@ class ESIAuthenticator:
             TokenRefreshError: If token refresh fails.
         """
         if not self.client_session:
+            # TODO character ID never in scope here, fix or change implementation
             raise TokenRefreshError("Client session not initialized", 0)
-
-        # Prepare Basic Auth header
-        credentials = f"{self.settings.client_id}:{self.settings.client_secret}"
-        encoded_credentials = base64.b64encode(credentials.encode()).decode()
-
-        headers = {
-            "Authorization": f"Basic {encoded_credentials}",
-            "Content-Type": "application/x-www-form-urlencoded",
-            "User-Agent": f"{self.settings.app_name}/1.0",
-        }
-
-        data = {
-            "grant_type": "refresh_token",
-            "refresh_token": refresh_token,
-        }
+        if self.oauth_metadata is None:
+            raise TokenRefreshError("OAuth2 metadata not loaded", 0)
 
         try:
-            logger.debug("Refreshing access token")
-            async with self.client_session.post(
-                self.settings.token_url, headers=headers, data=data
-            ) as response:
-                response_data = await response.json()
-
-                if response.status != 200:
-                    error_msg = f"Token refresh failed: {response_data.get('error_description', 'Unknown error')}"
-                    logger.error(f"{error_msg} (status: {response.status})")
-                    raise TokenRefreshError(error_msg, 0, response_data.get("error"))
-                logger.info(f"Token refresh response: {response_data!r}")
-                logger.info("Successfully refreshed token")
-                return ESIAuthenticationResponse.model_validate(response_data)
+            response_data = await AH.refresh_token(
+                refresh_token=refresh_token,
+                client_id=self.settings.client_id,
+                token_endpoint=self.oauth_metadata["token_endpoint"],
+                user_agent=self.user_agent,
+                client_session=self.client_session,
+            )
+            return ESIAuthenticationResponse.model_validate(response_data)
 
         except aiohttp.ClientError as e:
             error_msg = f"Network error during token refresh: {e}"

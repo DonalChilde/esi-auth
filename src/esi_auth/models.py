@@ -45,6 +45,7 @@ class VerifiedToken(BaseModel):
     character_owner_hash: str = Field(
         ..., description="Hash of the token owner", alias="CharacterOwnerHash"
     )
+    # TODO drop this field?
     client_id: str = Field(
         ..., description="Client ID associated with the token", alias="ClientID"
     )

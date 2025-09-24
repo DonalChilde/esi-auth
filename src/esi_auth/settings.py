@@ -64,31 +64,9 @@ class ESIAuthSettings(BaseSettings):
     )
 
     # Auth endpoints from https://login.eveonline.com/.well-known/oauth-authorization-server
-    authorization_metadata_url: str = Field(
+    oauth2_authorization_metadata_url: str = Field(
         default="https://login.eveonline.com/.well-known/oauth-authorization-server",
         description="URL for OAuth2 authorization server metadata",
-    )
-    authorization_endpoint: str = Field(
-        default="https://login.eveonline.com/v2/oauth/authorize",
-        description="Authorization endpoint for OAuth2 flow",
-    )
-    token_endpoint: str = Field(
-        default="https://login.eveonline.com/v2/oauth/token",
-        description="Token endpoint for OAuth2 flow",
-    )
-    jwks_uri: str = Field(
-        default="https://login.eveonline.com/oauth/jwks",
-        description="JWKS URI for token verification",
-    )
-    revoke_token_endpoint: str = Field(
-        default="https://login.eveonline.com/v2/oauth/revoke",
-        description="Token revocation endpoint",
-    )
-    token_signing_alg: str = Field(
-        default="HS256", description="Algorithm used for signing tokens"
-    )
-    code_challenge_method: str = Field(
-        default="S256", description="PKCE code challenge method"
     )
 
     # OAuth2 flow configuration

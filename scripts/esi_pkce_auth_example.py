@@ -75,7 +75,6 @@ import jwt
 from aiohttp import web
 from jwt.jwks_client import PyJWKClient
 from rich.console import Console
-from rich.pretty import pprint
 
 logger = logging.getLogger(__name__)
 
@@ -109,6 +108,7 @@ class OauthMetadata(TypedDict):
     issuer: str
     authorization_endpoint: str
     token_endpoint: str
+    revocation_endpoint: str
     jwks_uri: str
     response_types_supported: list[str]
     subject_types_supported: list[str]
@@ -401,7 +401,7 @@ def validate_jwt_token(
 #############################################################################
 
 
-async def revoke_token(
+async def revoke_refresh_token(
     access_token: str,
     revocation_uri: str,
     client_id: str,
@@ -424,7 +424,7 @@ async def revoke_token(
     }
     payload: dict[str, str] = {
         "token": access_token,
-        "token_type_hint": "access_token",
+        "token_type_hint": "refresh_token",
         "client_id": client_id,
     }
     response = await client_session.post(revocation_uri, headers=headers, data=payload)
@@ -598,6 +598,30 @@ def signing_algos_supported(jkws: JWKS) -> list[str]:
     return supported_algos
 
 
+async def make_authenticated_api_call(url: str, access_token: str) -> dict[str, Any]:
+    """Make an authenticated API call using the provided access token.
+
+    Args:
+        url: The API endpoint URL to call.
+        access_token: The access token for authentication.
+
+    Returns:
+        The JSON response from the API call.
+
+    Raises:
+        aiohttp.ClientResponseError: If the API request fails.
+    """
+    headers = {
+        "Authorization": f"Bearer {access_token}",
+        "User-Agent": USER_AGENT,
+    }
+    async with aiohttp.ClientSession() as client_session:
+        response = await client_session.get(url, headers=headers)
+        response.raise_for_status()
+        result = await response.json()
+    return result
+
+
 async def main() -> None:
     """Main function to run the OAuth PKCE flow example.
 
@@ -629,7 +653,7 @@ async def main() -> None:
 
     # Define the scopes to request authorization for in the token. Can be a subset
     # of the scopes defined in your EVE SSO application.
-    scopes = ["publicData", "esi-characters.read_contacts.v1"]
+    scopes = ["publicData", "esi-skills.read_skills.v1"]
 
     ############################################################################
     # Start of script
@@ -721,9 +745,13 @@ async def main() -> None:
         console.rule("[bold red]Step 2: Get OAuth Metadata")
         console.print()
         console.print("Fetching OAuth metadata...")
-        auth_metadata = await fetch_oauth_metadata(
-            client_session=client_session, oauth_metadata_url=oauth_metadata_url
-        )
+        try:
+            auth_metadata = await fetch_oauth_metadata(
+                client_session=client_session, oauth_metadata_url=oauth_metadata_url
+            )
+        except aiohttp.ClientResponseError as e:
+            console.print(f"Error fetching OAuth metadata: {e}")
+            raise SystemExit(1) from e
 
         console.print("Oauth metadata received:")
         console.print(auth_metadata)
@@ -737,13 +765,17 @@ async def main() -> None:
         console.print("Requesting access token...")
         # token_uri = "https://login.eveonline.com/v2/oauth/token"
         token_uri = auth_metadata.get("token_endpoint")
-        esi_token = await request_token(
-            client_id=client_id,
-            authorization_code=authorization_code,
-            code_verifier=code_verifier.decode(),
-            token_uri=token_uri,
-            client_session=client_session,
-        )
+        try:
+            esi_token = await request_token(
+                client_id=client_id,
+                authorization_code=authorization_code,
+                code_verifier=code_verifier.decode(),
+                token_uri=token_uri,
+                client_session=client_session,
+            )
+        except aiohttp.ClientResponseError as e:
+            console.print(f"Error requesting token: {e}")
+            raise SystemExit(1) from e
         console.print("Access token and refresh token received:")
         console.print(esi_token)
 
@@ -760,9 +792,13 @@ async def main() -> None:
         )
         # jwks_uri = "https://login.eveonline.com/oauth/jwks"
         jwks_uri = auth_metadata.get("jwks_uri")
-        json_web_key_set = await fetch_jwks(
-            client_session=client_session, jwks_uri=jwks_uri
-        )
+        try:
+            json_web_key_set = await fetch_jwks(
+                client_session=client_session, jwks_uri=jwks_uri
+            )
+        except aiohttp.ClientResponseError as e:
+            console.print(f"Error fetching JWKS: {e}")
+            raise SystemExit(1) from e
         console.print("Json Web Key Set (JWKS) received:")
         console.print(json_web_key_set)
 
@@ -773,6 +809,9 @@ async def main() -> None:
         console.rule("[bold red]Step 4: Validate JWT Access Token")
         console.print()
         console.print(f"Validating JWT token, using {jwks_uri} for the JWKS URI...")
+        console.print(
+            "The validated and decoded token is where you will find the character name and ID."
+        )
         try:
             validated_token = validate_jwt_token(
                 esi_token["access_token"],
@@ -781,11 +820,15 @@ async def main() -> None:
                 audience=expected_audience,
                 issuers=accepted_issuers,
             )
-            console.print("Validated and decoded JWT Token:")
+            character_name = validated_token.get("name", "Unknown")
+            character_id = validated_token.get("sub", "Unknown").split(":")[-1]
+            console.print(
+                f"Validated and decoded JWT Token for {character_name} (ID: {character_id}):"
+            )
             console.print(validated_token)
         except Exception as e:
             console.print(f"Error validating JWT token: {e}")
-        esi_refresh_token = esi_token.get("refresh_token")
+            raise SystemExit(1) from e
 
         ########################################################################
         # Refresh the tokens
@@ -799,13 +842,19 @@ async def main() -> None:
         )
         console.print("Refreshing token...")
         # This url is found in the oauth metadata, hardcoded here for simplicity.
-        refresh_uri = "https://login.eveonline.com/v2/oauth/token"
-        refreshed_token = await refresh_token(
-            refresh_token=esi_refresh_token,
-            client_id=client_id,
-            refresh_uri=refresh_uri,
-            client_session=client_session,
-        )
+        esi_refresh_token = esi_token.get("refresh_token")
+        # refresh_uri = "https://login.eveonline.com/v2/oauth/token"
+        refresh_uri = auth_metadata.get("token_endpoint")
+        try:
+            refreshed_token = await refresh_token(
+                refresh_token=esi_refresh_token,
+                client_id=client_id,
+                refresh_uri=refresh_uri,
+                client_session=client_session,
+            )
+        except aiohttp.ClientResponseError as e:
+            console.print(f"Error refreshing token: {e}")
+            raise SystemExit(1) from e
         console.print(
             "New Access token and refresh token received. Note that it is possible "
             "for the refresh token to be rotated, so be sure to store the new "
@@ -824,21 +873,34 @@ async def main() -> None:
             "Now that we have an access token, we can make an example API call to "
             "the EVE Online API."
         )
-        console.print("TODO make example call here...")
+        root_url = "https://esi.evetech.net/latest"
+        api_path = f"/characters/{character_id}/skills"
+        request_url = f"{root_url}{api_path}"
+        console.print(f"Making API call to {request_url}...")
+        try:
+            character_data = await make_authenticated_api_call(
+                url=request_url, access_token=esi_token["access_token"]
+            )
+        except aiohttp.ClientResponseError as e:
+            console.print(f"Error making API call: {e}")
+            raise SystemExit(1) from e
+
+        console.print("API call successful, response data:")
+        console.print(character_data)
 
         ########################################################################
-        # Revoke the access token
+        # Revoke the refresh token
         ########################################################################
         console.print()
-        console.rule("[bold red]Step 7: Revoke Access Token")
+        console.rule("[bold red]Step 7: Revoke Refresh Token")
         console.print()
-        console.print("You can revoke an access token if you feel the need...")
-        console.print("Revoking access token...")
-        # This url is found in the oauth metadata, hardcoded here for simplicity.
-        revocation_uri = "https://login.eveonline.com/v2/oauth/revoke"
+        console.print("You can revoke a refresh token if you feel the need...")
+        console.print("Revoking refresh token...")
+        # revocation_uri = "https://login.eveonline.com/v2/oauth/revoke"
+        revocation_uri = auth_metadata.get("revocation_endpoint")
         try:
-            await revoke_token(
-                access_token=esi_token["access_token"],
+            await revoke_refresh_token(
+                access_token=refreshed_token["refresh_token"],
                 revocation_uri=revocation_uri,
                 client_id=client_id,
                 client_session=client_session,
@@ -850,16 +912,29 @@ async def main() -> None:
         console.print("Esi PKCE auth example completed.")
 
         ############################################################################
-        # Show failed attempt to asscess API with revoked token
+        # Show failed attempt to refresh access token with revoked refresh token
         ############################################################################
         console.print()
-        console.rule("[bold red]Step 8: Attempt API Access with Revoked Token")
+        console.rule(
+            "[bold red]Step 8: Attempt to refresh access token with revoked refresh token"
+        )
         console.print()
         console.print(
-            "Now that we have revoked the access token, let's demonstrate that it "
-            "can no longer be used to access the API."
+            "Now that we have revoked the refresh token, let's demonstrate that it "
+            "can no longer be used to refresh the access token."
         )
-        console.print("TODO make example call here...")
+        console.print(f"Attempting to refresh token...")
+        try:
+            failed_request = await refresh_token(
+                refresh_token=refreshed_token["refresh_token"],
+                client_id=client_id,
+                refresh_uri=refresh_uri,
+                client_session=client_session,
+            )
+            console.print("Refresh token call unexpectedly succeeded, token data:")
+            console.print(failed_request)
+        except aiohttp.ClientResponseError as e:
+            console.print(f"Refresh token call failed as expected: {e}")
 
 
 if __name__ == "__main__":

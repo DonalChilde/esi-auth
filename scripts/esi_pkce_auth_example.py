@@ -381,6 +381,7 @@ def validate_jwt_token(
             algorithms=[alg],
             audience=audience,
             issuer=issuers,
+            options={"verify_aud": True, "verify_iss": True},
         )
     except jwt.ExpiredSignatureError as e:
         logger.error("Token has expired")
@@ -635,7 +636,9 @@ async def main() -> None:
     ############################################################################
 
     console = Console()
+    console.print()
     console.rule("[bold red]EVE SSO Authentication Example Script")
+    console.print()
     console.print(
         "[bold]NOTE:[/bold] You must first register an application at [blue]https://developers.eveonline.com/[/blue]"
     )
@@ -662,8 +665,9 @@ async def main() -> None:
     ############################################################################
     # Get authorization code
     ############################################################################
-
-    console.rule("\n[bold red]Step 1: Get Authorization Code\n")
+    console.print()
+    console.rule("[bold red]Step 1: Get Authorization Code")
+    console.print()
 
     code_verifier, code_challenge = generate_code_challenge()
     redirect_uri_str = callback_uri(
@@ -687,9 +691,12 @@ async def main() -> None:
 
     # Wait for the OAuth callback
     try:
+        console.print(f"Starting http server...")
         console.print(
-            f"Starting http server...\nListening on http://{callback_host}:{callback_port}{callback_route}...\nWaiting for OAuth callback..."
+            f"Listening on http://{callback_host}:{callback_port}{callback_route}..."
         )
+        console.print("Waiting for OAuth callback...")
+        console.print("Press Ctrl-C to cancel.")
         authorization_code = await run_callback_server(
             expected_state=state,
             callback_host=callback_host,
@@ -710,7 +717,9 @@ async def main() -> None:
         ############################################################################
         # Get oauth metadata
         ############################################################################
-        console.rule("\n[bold red]Step 2: Get OAuth Metadata\n")
+        console.print()
+        console.rule("[bold red]Step 2: Get OAuth Metadata")
+        console.print()
         console.print("Fetching OAuth metadata...")
         auth_metadata = await fetch_oauth_metadata(
             client_session=client_session, oauth_metadata_url=oauth_metadata_url
@@ -722,7 +731,9 @@ async def main() -> None:
         ############################################################################
         # Exchange authorization code for tokens
         ############################################################################
+        console.print()
         console.rule("[bold red]Step 3: Exchange Authorization Code for Tokens")
+        console.print()
         console.print("Requesting access token...")
         # token_uri = "https://login.eveonline.com/v2/oauth/token"
         token_uri = auth_metadata.get("token_endpoint")
@@ -739,7 +750,9 @@ async def main() -> None:
         ############################################################################
         # Get the Json Web Key Set (JWKS)
         ############################################################################
-        console.rule("\n[bold red]Step 4: Validate JWT Access Token\n")
+        console.print()
+        console.rule("[bold red]Step X: Fetch JWKS")
+        console.print()
         console.print("Fetching Json Web Key Set (JWKS)...")
         console.print(
             "This is fetched just to show an example of the output, the JWKS URI will "
@@ -756,6 +769,9 @@ async def main() -> None:
         ################################################################################
         # Validate the JWT token
         ################################################################################
+        console.print()
+        console.rule("[bold red]Step 4: Validate JWT Access Token")
+        console.print()
         console.print(f"Validating JWT token, using {jwks_uri} for the JWKS URI...")
         try:
             validated_token = validate_jwt_token(
@@ -774,7 +790,9 @@ async def main() -> None:
         ########################################################################
         # Refresh the tokens
         ########################################################################
-        console.rule("\n[bold red]Step 5: Refresh Tokens\n")
+        console.print()
+        console.rule("[bold red]Step 5: Refresh Tokens")
+        console.print()
         console.print(
             "Esi tokens are usually good for 20 minutes, but you will need to "
             "refresh them periodically."
@@ -799,7 +817,9 @@ async def main() -> None:
         ########################################################################
         # Show an example of API access using the access token
         ########################################################################
-        console.rule("\n[bold red]Step 6: Example API Access with Access Token\n")
+        console.print()
+        console.rule("[bold red]Step 6: Example API Access with Access Token")
+        console.print()
         console.print(
             "Now that we have an access token, we can make an example API call to "
             "the EVE Online API."
@@ -809,7 +829,9 @@ async def main() -> None:
         ########################################################################
         # Revoke the access token
         ########################################################################
+        console.print()
         console.rule("[bold red]Step 7: Revoke Access Token")
+        console.print()
         console.print("You can revoke an access token if you feel the need...")
         console.print("Revoking access token...")
         # This url is found in the oauth metadata, hardcoded here for simplicity.
@@ -830,7 +852,9 @@ async def main() -> None:
         ############################################################################
         # Show failed attempt to asscess API with revoked token
         ############################################################################
-        console.rule("\n[bold red]Step 8: Attempt API Access with Revoked Token\n")
+        console.print()
+        console.rule("[bold red]Step 8: Attempt API Access with Revoked Token")
+        console.print()
         console.print(
             "Now that we have revoked the access token, let's demonstrate that it "
             "can no longer be used to access the API."

@@ -273,7 +273,6 @@ def validate_jwt_token(
     :raises ExpiredSignatureError: If the token is invalid
     :raises Exception: If any other error occurs
     """
-    # TODO include other validation info, like audience, issuer, etc.
     headers = {"User-Agent": USER_AGENT}
     jwks_client = PyJWKClient(jkws_uri, headers=headers)
     signing_key = jwks_client.get_signing_key_from_jwt(access_token)
@@ -312,6 +311,7 @@ def callback_uri(
     Args:
         host: The hostname for the callback (default: localhost).
         port: The port for the callback (default: 8080).
+        route: The route for the callback (default: /callback).
 
     Returns:
         The full callback URI.

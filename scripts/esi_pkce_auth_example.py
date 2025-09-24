@@ -61,6 +61,7 @@ USER_AGENT = "Example auth script/1.0"
 ############################################################################
 class JWK(TypedDict):
     """JSON Web Key structure for JWT signature verification."""
+
     kty: str
     use: str
     kid: str
@@ -71,11 +72,13 @@ class JWK(TypedDict):
 
 class JWKS(TypedDict):
     """JSON Web Key Set containing multiple JWKs."""
+
     keys: list[JWK]
 
 
 class OauthMetadata(TypedDict):
     """OAuth2 server metadata from well-known endpoint."""
+
     issuer: str
     authorization_endpoint: str
     token_endpoint: str
@@ -90,6 +93,7 @@ class OauthMetadata(TypedDict):
 
 class OauthToken(TypedDict):
     """OAuth2 token response structure."""
+
     access_token: str
     token_type: str
     expires_in: int
@@ -529,22 +533,6 @@ async def main() -> None:
     Demonstrates the complete OAuth2 Authorization Code Flow with PKCE for EVE Online SSO,
     including authorization, token exchange, JWT validation, and token refresh.
     """
-    console = Console()
-    console.rule("[bold red]EVE SSO Authentication Example Script")
-    console.print(
-        "[bold]NOTE:[/bold] You must first register an application at [blue]https://developers.eveonline.com/[/blue]"
-    )
-    console.print()
-    console.print(
-        "This script demonstrates the OAuth2 Authorization Code Flow with PKCE for the EVE Online ESI."
-    )
-    console.print(
-        "It will provide examples of obtaining an authorization code, exchanging it for tokens, and validating the JWT access token, and refreshing the tokens."
-    )
-    console.print(
-        "Make sure to configure the callback settings in this script to match your EVE SSO application redirect URI."
-    )
-    console.print()
     ############################################################################
     # auth settings
     ############################################################################
@@ -570,6 +558,23 @@ async def main() -> None:
     # of the scopes defined in your EVE SSO application.
     scopes = ["publicData", "esi-characters.read_contacts.v1"]
     ############################################################################
+
+    console = Console()
+    console.rule("[bold red]EVE SSO Authentication Example Script")
+    console.print(
+        "[bold]NOTE:[/bold] You must first register an application at [blue]https://developers.eveonline.com/[/blue]"
+    )
+    console.print()
+    console.print(
+        "This script demonstrates the OAuth2 Authorization Code Flow with PKCE for the EVE Online ESI."
+    )
+    console.print(
+        "It will provide examples of obtaining an authorization code, exchanging it for tokens, and validating the JWT access token, and refreshing the tokens."
+    )
+    console.print(
+        "Make sure to configure the callback settings in this script to match your EVE SSO application redirect URI."
+    )
+    console.print()
 
     client_id = console.input("Enter your EVE SSO Client ID: ").strip()
     code_verifier, code_challenge = generate_code_challenge()

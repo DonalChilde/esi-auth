@@ -2,8 +2,8 @@
 
 from unittest.mock import Mock, patch
 
-from esi_auth import api
-from esi_auth.models import AuthenticatedCharacters
+from esi_auth.old import api
+from esi_auth.old.models import AuthenticatedCharacters
 
 
 class TestAPIFunctions:

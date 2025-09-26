@@ -8,6 +8,7 @@ __version__ = "0.1.0"
 # Public API exports
 import logging
 
+from ..logging_config import setup_logging
 from .api import (
     authenticate_character,
     backup_characters,
@@ -21,7 +22,6 @@ from .api import (
     restore_characters,
     validate_token,
 )
-from .logging_config import setup_logging
 from .models import (
     AuthenticatedCharacters,
     AuthenticationError,

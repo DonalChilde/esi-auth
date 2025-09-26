@@ -16,7 +16,7 @@ from aiohttp import web
 from jwt.jwks_client import PyJWKClient
 from whenever import Instant, PlainDateTime
 
-from . import auth_helpers as AH
+from .. import auth_helpers as AH
 from .models import (
     AuthenticationError,
     CharacterInfo,

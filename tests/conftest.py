@@ -6,8 +6,8 @@ from unittest.mock import Mock
 import pytest
 from whenever import Instant
 
-from esi_auth.models import CharacterToken
-from esi_auth.settings import set_testing_profile
+from esi_auth.old.models import CharacterToken
+from esi_auth.old.settings import set_testing_profile
 
 
 @pytest.fixture(autouse=True)

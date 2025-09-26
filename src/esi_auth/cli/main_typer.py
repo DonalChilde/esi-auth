@@ -13,10 +13,10 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
-from .. import api
-from ..models import AuthenticationError, TokenRefreshError
-from ..settings import get_settings, set_production_profile, set_testing_profile
-from ..storage import TokenStorageError
+from ..old import api
+from ..old.models import AuthenticationError, TokenRefreshError
+from ..old.settings import get_settings, set_production_profile, set_testing_profile
+from ..old.storage import TokenStorageError
 
 # Create the main Typer application
 app = typer.Typer(

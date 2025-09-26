@@ -325,7 +325,7 @@ def validate_jwt_token(
     signing_key = jwks_client.get_signing_key(kid).key
     try:
         # Decode and validate the token
-        data = jwt.decode(
+        data = jwt.decode(  # type: ignore
             jwt=access_token,
             key=signing_key,
             algorithms=[alg],

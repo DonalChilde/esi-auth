@@ -1,3 +1,4 @@
+from collections.abc import Sequence
 from pathlib import Path
 from typing import Any, ClassVar
 
@@ -27,17 +28,9 @@ class EsiAuthSettings(BaseSettings):
         extra="ignore",
     )
 
-    # OAuth2 credentials
-    client_id: str = Field(
-        default="NOT_SET",
-        description="EVE Online application client ID from developers.eveonline.com",
-    )
-    client_secret: str = Field(
-        default="NOT_SET",
-        description="EVE Online application client secret from developers.eveonline.com",
-    )
-
+    ############################################################################
     # Application configuration
+    ############################################################################
     app_name: str = Field(
         default=APPLICATION_NAME,
         description="Application name.",
@@ -63,6 +56,20 @@ class EsiAuthSettings(BaseSettings):
         description="Filename for storing character tokens",
     )
 
+    ############################################################################
+    # Oauth2
+    ############################################################################
+
+    # OAuth2 credentials
+    client_id: str = Field(
+        default="NOT_SET",
+        description="EVE Online application client ID from developers.eveonline.com",
+    )
+    client_secret: str = Field(
+        default="NOT_SET",
+        description="EVE Online application client secret from developers.eveonline.com",
+    )
+
     # ESI API configuration
     esi_base_url: str = Field(
         default="https://esi.evetech.net", description="Base URL for EVE Online ESI API"
@@ -72,13 +79,23 @@ class EsiAuthSettings(BaseSettings):
         default="https://login.eveonline.com", description="Base URL for EVE Online SSO"
     )
 
-    # Auth endpoints from https://login.eveonline.com/.well-known/oauth-authorization-server
+    # Authorization endpoint - https://login.eveonline.com/.well-known/oauth-authorization-server
     oauth2_authorization_metadata_url: str = Field(
         default="https://login.eveonline.com/.well-known/oauth-authorization-server",
         description="URL for OAuth2 authorization server metadata",
     )
 
-    # OAuth2 flow configuration
+    # Audience for token validation
+    oauth2_audience: str = Field(
+        default="EVE Online", description="Audience for validating JWT tokens"
+    )
+
+    # Issuer for token validation
+    oauth2_issuer: Sequence[str] = Field(
+        default=["login.eveonline.com"], description="Issuer for validating JWT tokens"
+    )
+
+    # Callback url settings
     callback_host: str = Field(
         default="localhost", description="Host for OAuth callback server"
     )
@@ -89,6 +106,25 @@ class EsiAuthSettings(BaseSettings):
 
     callback_route: str = Field(
         default="/callback", description="Route for OAuth callback server"
+    )
+
+    ############################################################################
+    # User agent configuration
+    ############################################################################
+
+    # User agent fields
+    character_name: str = Field(
+        default="Unknown", description="Character name for User-Agent header"
+    )
+
+    user_email: str = Field(
+        default="Unknown", description="User email for User-Agent header"
+    )
+    user_app_name: str = Field(
+        default="Unknown", description="App name for User-Agent header"
+    )
+    user_app_version: str = Field(
+        default="Unknown", description="App version for User-Agent header"
     )
 
     def ensure_app_dir(self) -> None:

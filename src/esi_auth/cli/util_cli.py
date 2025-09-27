@@ -22,6 +22,9 @@ class AppConfig(TypedDict):
 @app.command()
 def parse_app_json(
     file_in: Annotated[Path, typer.Argument(..., exists=True, dir_okay=False)],
+    file_out: Annotated[
+        Path, typer.Argument(..., dir_okay=False, writable=True)
+    ] = Path(".example.env"),
 ):
     """Parse the json representation of the app configuration from Eve Online Developers.
 
@@ -46,4 +49,6 @@ def parse_app_json(
     ]
     text_out = "\n".join(env_lines) + "\n"
     console.print("The following lines can be placed in the .env file:")
-    console.print(text_out, no_wrap=True)
+    console.print(text_out, no_wrap=True, crop=False, overflow="ignore")
+    file_out.write_text(text_out)
+    console.print(f"Wrote settings to {file_out.absolute()}")

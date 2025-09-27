@@ -99,7 +99,7 @@ class AuthenticationError(Exception):
         self.error_code = error_code
 
 
-def generate_code_challenge() -> tuple[bytes, str]:
+def generate_code_challenge() -> tuple[str, str]:
     """Generates a code challenge for PKCE.
 
     Returns:
@@ -109,7 +109,7 @@ def generate_code_challenge() -> tuple[bytes, str]:
     sha256 = hashlib.sha256()
     sha256.update(code_verifier)
     code_challenge = base64.urlsafe_b64encode(sha256.digest()).decode().rstrip("=")
-    return (code_verifier, code_challenge)
+    return (code_verifier.decode(), code_challenge)
 
 
 async def request_token(
@@ -158,7 +158,7 @@ async def request_token(
     return result
 
 
-async def refresh_token(
+async def do_refresh_token(
     refresh_token: str,
     client_id: str,
     token_endpoint: str,
@@ -530,6 +530,43 @@ async def run_callback_server(
     finally:
         await runner.cleanup()
         logger.debug("Callback server stopped")
+
+
+async def get_token(
+    client_id: str,
+    sso_url: str,
+    state: str,
+    code_verifier: str,
+    token_endpoint: str,
+    client_session: aiohttp.ClientSession,
+    user_agent: str,
+    callback_host: str = "localhost",
+    callback_port: int = 8080,
+    callback_route: str = "/callback",
+) -> OauthToken:
+    """Run the full OAuth2 authorization code flow to get an access token."""
+    logger.info(f"Starting authentication flow. Navigate to:")
+    logger.info(sso_url)
+    logger.info(
+        f"Listening on http://{callback_host}:{callback_port}{callback_route} for callback..."
+    )
+    authorization_code = await run_callback_server(
+        expected_state=state,
+        callback_host=callback_host,
+        callback_port=callback_port,
+        callback_route=callback_route,
+    )
+    logger.info(f"Received authorization code: {authorization_code}")
+    token = await request_token(
+        client_id=client_id,
+        authorization_code=authorization_code,
+        code_verifier=code_verifier,
+        token_endpoint=token_endpoint,
+        user_agent=user_agent,
+        client_session=client_session,
+    )
+    logger.info(f"Received token: {token}")
+    return token
 
 
 # def signing_algos_supported(jkws: JWKS) -> list[str]:

@@ -9,6 +9,9 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 APPLICATION_NAME = "pfmsoft-esi-auth"
 DEFAULT_APP_DIR = Path(typer.get_app_dir(APPLICATION_NAME))
 
+# TODO load and save to file
+# TODO cli command to update oauth metadata
+
 
 class EsiAuthSettings(BaseSettings):
     """Application settings for ESI authentication.
@@ -54,6 +57,11 @@ class EsiAuthSettings(BaseSettings):
     token_file_name: str = Field(
         default="character_tokens.json",
         description="Filename for storing character tokens",
+    )
+
+    # HTTP client configuration
+    request_timeout: int = Field(
+        default=30, description="HTTP request timeout in seconds"
     )
 
     ############################################################################

@@ -2,8 +2,8 @@
 
 from unittest.mock import Mock, patch
 
-from esi_auth.old import api
-from esi_auth.old.models import AuthenticatedCharacters
+from esi_auth.old import old_api
+from esi_auth.old.old_models import AuthenticatedCharacters
 
 
 class TestAPIFunctions:
@@ -19,7 +19,7 @@ class TestAPIFunctions:
             mock_storage.load_characters.return_value = mock_characters
             mock_get_storage.return_value = mock_storage
 
-            characters = api.load_characters()
+            characters = old_api.load_characters()
 
             assert len(characters.characters) == 1
             assert sample_character_token.character_id in characters.characters
@@ -34,7 +34,7 @@ class TestAPIFunctions:
             ]
             mock_get_storage.return_value = mock_storage
 
-            characters = api.list_characters()
+            characters = old_api.list_characters()
 
             assert len(characters) == 2
             assert sample_character_token in characters
@@ -47,7 +47,7 @@ class TestAPIFunctions:
             mock_storage.get_character.return_value = sample_character_token
             mock_get_storage.return_value = mock_storage
 
-            character = api.get_character(sample_character_token.character_id)
+            character = old_api.get_character(sample_character_token.character_id)
 
             assert character == sample_character_token
             mock_storage.get_character.assert_called_once_with(
@@ -61,7 +61,7 @@ class TestAPIFunctions:
             mock_storage.get_character.return_value = None
             mock_get_storage.return_value = mock_storage
 
-            character = api.get_character(99999999)
+            character = old_api.get_character(99999999)
 
             assert character is None
 
@@ -72,7 +72,7 @@ class TestAPIFunctions:
             mock_storage.remove_character.return_value = True
             mock_get_storage.return_value = mock_storage
 
-            removed = api.remove_character(sample_character_token.character_id)
+            removed = old_api.remove_character(sample_character_token.character_id)
 
             assert removed is True
             mock_storage.remove_character.assert_called_once_with(
@@ -86,7 +86,7 @@ class TestAPIFunctions:
             mock_storage.remove_character.return_value = False
             mock_get_storage.return_value = mock_storage
 
-            removed = api.remove_character(99999999)
+            removed = old_api.remove_character(99999999)
 
             assert removed is False
 
@@ -99,7 +99,7 @@ class TestAPIFunctions:
             mock_storage.backup_storage.return_value = backup_path
             mock_get_storage.return_value = mock_storage
 
-            result_path = api.backup_characters(backup_path)
+            result_path = old_api.backup_characters(backup_path)
 
             assert result_path == backup_path
             mock_storage.backup_storage.assert_called_once_with(backup_path)
@@ -112,6 +112,6 @@ class TestAPIFunctions:
             mock_storage = Mock()
             mock_get_storage.return_value = mock_storage
 
-            api.restore_characters(backup_path)
+            old_api.restore_characters(backup_path)
 
             mock_storage.restore_from_backup.assert_called_once_with(backup_path)

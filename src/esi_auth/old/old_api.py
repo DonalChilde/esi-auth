@@ -8,9 +8,9 @@ and character operations.
 import logging
 from typing import Any
 
-from .auth import ESIAuthenticator
-from .models import AuthenticatedCharacters, CharacterToken
-from .storage import TokenStorage, get_token_storage
+from .old_auth import ESIAuthenticator
+from .old_models import AuthenticatedCharacters, CharacterToken
+from .old_storage import TokenStorage, get_token_storage
 
 logger = logging.getLogger(__name__)
 

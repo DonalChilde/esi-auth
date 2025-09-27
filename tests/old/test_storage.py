@@ -2,8 +2,8 @@
 
 import pytest
 
-from esi_auth.old.models import AuthenticatedCharacters
-from esi_auth.old.storage import TokenStorage, TokenStorageError
+from esi_auth.old.old_models import AuthenticatedCharacters
+from esi_auth.old.old_storage import TokenStorage, TokenStorageError
 
 
 class TestTokenStorage:

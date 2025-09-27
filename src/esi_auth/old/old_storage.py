@@ -8,8 +8,8 @@ import json
 import logging
 from pathlib import Path
 
-from .models import AuthenticatedCharacters, CharacterToken
-from .settings import get_settings
+from .old_models import AuthenticatedCharacters, CharacterToken
+from .old_settings import get_settings
 
 logger = logging.getLogger(__name__)
 

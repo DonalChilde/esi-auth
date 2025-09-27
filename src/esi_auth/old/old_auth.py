@@ -17,7 +17,7 @@ from jwt.jwks_client import PyJWKClient
 from whenever import Instant, PlainDateTime
 
 from .. import auth_helpers as AH
-from .models import (
+from .old_models import (
     AuthenticationError,
     CharacterInfo,
     CharacterToken,
@@ -25,7 +25,7 @@ from .models import (
     TokenRefreshError,
     VerifiedToken,
 )
-from .settings import get_settings
+from .old_settings import get_settings
 
 logger = logging.getLogger(__name__)
 

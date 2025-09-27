@@ -93,6 +93,21 @@ class ESIAuthSettings(BaseSettings):
         default=3, description="Maximum number of HTTP request retries"
     )
 
+    # User agent fields
+    character_name: str = Field(
+        default="Unknown", description="Character name for User-Agent header"
+    )
+
+    user_email: str = Field(
+        default="Unknown", description="User email for User-Agent header"
+    )
+    user_app_name: str = Field(
+        default="Unknown", description="App name for User-Agent header"
+    )
+    user_app_version: str = Field(
+        default="Unknown", description="App version for User-Agent header"
+    )
+
     @property
     def token_file_path(self) -> Path:
         """Get the full path to the token storage file.

@@ -9,7 +9,7 @@ __version__ = "0.1.0"
 import logging
 
 from ..logging_config import setup_logging
-from .api import (
+from .old_api import (
     authenticate_character,
     backup_characters,
     get_character,
@@ -22,20 +22,20 @@ from .api import (
     restore_characters,
     validate_token,
 )
-from .models import (
+from .old_models import (
     AuthenticatedCharacters,
     AuthenticationError,
     CharacterInfo,
     CharacterToken,
     TokenRefreshError,
 )
-from .settings import (
+from .old_settings import (
     ESIAuthSettings,
     get_settings,
     set_production_profile,
     set_testing_profile,
 )
-from .storage import TokenStorage, TokenStorageError, get_token_storage
+from .old_storage import TokenStorage, TokenStorageError, get_token_storage
 
 __all__ = [
     # Core API functions

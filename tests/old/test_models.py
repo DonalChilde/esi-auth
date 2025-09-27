@@ -2,7 +2,7 @@
 
 from whenever import Instant
 
-from esi_auth.old.models import AuthenticatedCharacters, CharacterToken
+from esi_auth.old.old_models import AuthenticatedCharacters, CharacterToken
 
 
 class TestCharacterToken:

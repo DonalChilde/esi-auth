@@ -6,6 +6,7 @@ import typer
 
 from .auth_cli import app as auth_app
 from .token_store_cli import app as token_store_app
+from .util_cli import app as util_app
 
 # TODO import SETTINGS
 app = typer.Typer(no_args_is_help=True)
@@ -13,6 +14,7 @@ app = typer.Typer(no_args_is_help=True)
 
 app.add_typer(auth_app, name="character", help="Manage authorized characters.")
 app.add_typer(token_store_app, name="token-store", help="Manage token storage.")
+app.add_typer(util_app, name="util", help="Utility commands.")
 
 
 @dataclass

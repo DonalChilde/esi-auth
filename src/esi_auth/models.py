@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from typing import Self
 
 from pydantic import BaseModel, Field
 from whenever import Instant
@@ -29,6 +30,24 @@ class CallbackUrl:
             The complete callback URL.
         """
         return f"http://{self.callback_host}:{self.callback_port}{self.callback_route}"
+
+    @classmethod
+    def parse(cls, url: str) -> Self:
+        """Parse a full URL into its components.
+
+        Args:
+            url: The full callback URL to parse.
+
+        Returns:
+            An instance of CallbackUrl with parsed components.
+        """
+        from urllib.parse import urlparse
+
+        parsed = urlparse(url)
+        host = parsed.hostname or "localhost"
+        port = parsed.port or 8080
+        route = parsed.path or "/callback"
+        return cls(callback_host=host, callback_port=port, callback_route=route)
 
 
 class VerifiedToken(BaseModel):

@@ -1,7 +1,11 @@
 """ESI OAuth2 authentication flow implementation.
 
 This module handles the complete OAuth2 flow for EVE Online ESI authentication,
-including authorization, token exchange, and token refresh operations.
+including authorization, token exchange, and token refresh operations. These functions
+operate at a higher level than their auth_helper counterparts, orchestrating
+the entire process in a more user-friendly manner, creating and consuming CharacterToken
+objects.
+
 """
 
 import logging
@@ -311,7 +315,7 @@ async def request_token(
     return token
 
 
-async def validate_token(auth_params: AuthParams, access_token: str) -> dict[str, Any]:
+def validate_token(auth_params: AuthParams, access_token: str) -> dict[str, Any]:
     """Validate the received JWT access token."""
     validated_token = AH.validate_jwt_token(
         access_token=access_token,
@@ -354,7 +358,7 @@ async def authenticate_character(
     logger.info(f"Received authorization code: {_authorization_code}")
     token = await request_token(auth_params, _authorization_code, client_session)
     logger.info(f"Received token: {token}")
-    validated_token = await validate_token(auth_params, token["access_token"])
+    validated_token = validate_token(auth_params, token["access_token"])
     logger.info(f"Validated token: {validated_token}")
     character_token = CharacterToken(
         character_id=validated_token["CharacterID"],
@@ -369,7 +373,7 @@ async def authenticate_character(
     return character_token
 
 
-async def refresh_character_token(
+async def refresh_character(
     auth_params: AuthParams,
     character_token: CharacterToken,
     client_session: aiohttp.ClientSession,
@@ -382,7 +386,7 @@ async def refresh_character_token(
         user_agent=auth_params.user_agent,
         client_session=client_session,
     )
-    validated_token = await validate_token(auth_params, refresh_token["access_token"])
+    validated_token = validate_token(auth_params, refresh_token["access_token"])
     new_character_token = CharacterToken(
         character_id=validated_token["CharacterID"],
         character_name=validated_token["CharacterName"],

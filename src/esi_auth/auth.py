@@ -237,15 +237,24 @@ class AuthParams:
 
 
 def create_auth_params(
-    jwks_client: PyJWKClient, oauth_metadata: AH.OauthMetadata
+    jwks_client: PyJWKClient | None = None,
 ) -> AuthParams:
-    """Create authentication parameters from current settings."""
+    """Create authentication parameters from current settings.
+
+    Args:
+        jwks_client: Optional PyJWKClient instance. If None, a new one will be created.
+
+    Returns:
+        AuthParams: The authentication parameters.
+    """
     settings = get_settings()
+    if jwks_client is None:
+        jwks_client = PyJWKClient(settings.jwks_uri)
     code_verifier, code_challenge = AH.generate_code_challenge()
     return AuthParams(
         client_id=settings.client_id,
-        token_endpoint=oauth_metadata.get("token_endpoint"),
-        authorization_endpoint=oauth_metadata.get("authorization_endpoint"),
+        token_endpoint=settings.token_endpoint,
+        authorization_endpoint=settings.authorization_endpoint,
         callback_url=CallbackUrl(
             callback_host=settings.callback_host,
             callback_port=settings.callback_port,

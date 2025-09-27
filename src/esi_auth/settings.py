@@ -87,10 +87,22 @@ class EsiAuthSettings(BaseSettings):
         default="https://login.eveonline.com", description="Base URL for EVE Online SSO"
     )
 
-    # Authorization endpoint - https://login.eveonline.com/.well-known/oauth-authorization-server
+    # Authorization metadata endpoint - https://login.eveonline.com/.well-known/oauth-authorization-server
     oauth2_authorization_metadata_url: str = Field(
         default="https://login.eveonline.com/.well-known/oauth-authorization-server",
         description="URL for OAuth2 authorization server metadata",
+    )
+    authorization_endpoint: str = Field(
+        default="https://login.eveonline.com/v2/oauth/authorize",
+        description="URL for OAuth2 authorization endpoint",
+    )
+    token_endpoint: str = Field(
+        default="https://login.eveonline.com/v2/oauth/token",
+        description="URL for OAuth2 token endpoint",
+    )
+    jwks_uri: str = Field(
+        default="https://login.eveonline.com/oauth/jwks",
+        description="URL for OAuth2 JSON Web Key Set (JWKS) endpoint",
     )
 
     # Audience for token validation

@@ -51,7 +51,7 @@ doc = []
 Documentation = "https://github.com/DonalChilde/esi-auth#readme"
 # Documentation_rtd = "https://esi-auth.readthedocs.io"
 Issues = "https://github.com/DonalChilde/esi-auth/issues"
-Source = "https://github.com/DonalChilde/esi-auth>"
+Source = "https://github.com/DonalChilde/esi-auth"
 
 
 [tool.pytest.ini_options]

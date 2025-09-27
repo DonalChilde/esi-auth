@@ -1,4 +1,8 @@
-"""Helper functions for OAuth2 authentication with EVE Online SSO."""
+"""Helper functions for OAuth2 authentication with EVE Online SSO.
+
+These functions are broken down into discrete steps that can be used
+individually or together to implement the OAuth2 authorization code flow with PKCE.
+"""
 
 ############################################################################
 # These TypedDicts are used for type hinting the JSON responses from the SSO
@@ -544,7 +548,10 @@ async def get_token(
     callback_port: int = 8080,
     callback_route: str = "/callback",
 ) -> OauthToken:
-    """Run the full OAuth2 authorization code flow to get an access token."""
+    """Run the full OAuth2 authorization code flow to get an access token.
+
+    Shown as an example of how to use the helper functions together.
+    """
     logger.info(f"Starting authentication flow. Navigate to:")
     logger.info(sso_url)
     logger.info(
@@ -566,45 +573,5 @@ async def get_token(
         client_session=client_session,
     )
     logger.info(f"Received token: {token}")
+
     return token
-
-
-# def signing_algos_supported(jkws: JWKS) -> list[str]:
-#     """Extracts the signing algorithms supported from the JWKS.
-
-#     Args:
-#         jkws: The JSON Web Key Set containing the signing keys.
-
-#     Returns:
-#         A list of supported signing algorithms.
-#     """
-#     supported_algos: list[str] = []
-#     for key in jkws.get("keys", []):
-#         alg = key.get("alg")
-#         if alg and alg not in supported_algos:
-#             supported_algos.append(alg)
-#     return supported_algos
-
-
-# async def make_authenticated_api_call(url: str, access_token: str) -> dict[str, Any]:
-#     """Make an authenticated API call using the provided access token.
-
-#     Args:
-#         url: The API endpoint URL to call.
-#         access_token: The access token for authentication.
-
-#     Returns:
-#         The JSON response from the API call.
-
-#     Raises:
-#         aiohttp.ClientResponseError: If the API request fails.
-#     """
-#     headers = {
-#         "Authorization": f"Bearer {access_token}",
-#         "User-Agent": USER_AGENT,
-#     }
-#     async with aiohttp.ClientSession() as client_session:
-#         response = await client_session.get(url, headers=headers)
-#         response.raise_for_status()
-#         result = await response.json()
-#     return result

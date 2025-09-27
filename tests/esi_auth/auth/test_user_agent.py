@@ -1,4 +1,4 @@
-from esi_auth.auth import get_package_url, get_user_agent
+from esi_auth.helpers import get_package_url, get_user_agent
 
 
 def test_get_user_agent():
@@ -16,3 +16,4 @@ def test_get_user_agent():
 def test_get_package_url():
     url = get_package_url("esi-auth", "Source")
     assert url == "https://github.com/DonalChilde/esi-auth"
+    # assert False

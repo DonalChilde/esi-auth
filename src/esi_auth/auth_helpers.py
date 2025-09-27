@@ -257,8 +257,17 @@ async def fetch_oauth_metadata(
     response = await client_session.get(oauth_metadata_url, headers=header)
     response.raise_for_status()
     result = await response.json()
-
     return result
+
+
+def fetch_oauth_metadata_sync(url: str, user_agent: str) -> OauthMetadata:
+    """Fetch the OAuth2 metadata from EVE Online in a blocking manner."""
+
+    async def fetch() -> OauthMetadata:
+        async with aiohttp.ClientSession() as session:
+            return await fetch_oauth_metadata(session, url, user_agent)
+
+    return asyncio.run(fetch())
 
 
 async def fetch_jwks(
@@ -329,7 +338,7 @@ def validate_jwt_token(
     signing_key = jwks_client.get_signing_key(kid).key
     try:
         # Decode and validate the token
-        data = jwt.decode(  # type: ignore
+        valid_decoded_token = jwt.decode(  # type: ignore
             jwt=access_token,
             key=signing_key,
             algorithms=[alg],
@@ -344,10 +353,7 @@ def validate_jwt_token(
         logger.error(f"Invalid token or other error: {e}")
         raise e
     # If we get here, the token is valid
-    logger.info(f"Token is valid. {data=}")
-    # Return the decoded token data
-
-    return data
+    return valid_decoded_token
 
 
 async def revoke_refresh_token(

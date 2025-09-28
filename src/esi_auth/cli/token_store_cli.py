@@ -39,6 +39,7 @@ def add(ctx: typer.Context):
 
     jwks_client = PyJWKClient(settings.jwks_uri)
     auth_params = create_auth_params(jwks_client=jwks_client)
+    console.print(settings.scopes)
     sso_url, state = get_sso_url(auth_params=auth_params, scopes=settings.scopes)
     logger.info(f"Attempting to add character authorization using the following url.")
     logger.info(f"{sso_url}")
@@ -169,7 +170,7 @@ def refresh(
         typer.Option(
             "-b",
             "--buffer",
-            help="Buffer time in minutes to consider a token as expiring.",
+            help="Buffer time in minutes to consider a token as expiring. Notr to exceed 15 minutes.",
         ),
     ] = 5,
 ):
@@ -180,6 +181,14 @@ def refresh(
     """
     console = Console()
     console.rule("[bold blue]Refresh Character Tokens[/bold blue]")
+    if buffer_minutes < 0:
+        console.print("Error: buffer_minutes must be non-negative.", style="bold red")
+        raise typer.Exit(code=1)
+    if buffer_minutes > 15:
+        console.print(
+            "Error: buffer_minutes should not exceed 15 minutes.", style="bold red"
+        )
+        raise typer.Exit(code=1)
 
     # Validate mutually exclusive options
     option_count = sum(

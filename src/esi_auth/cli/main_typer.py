@@ -70,19 +70,8 @@ def default_options(
     Insert pithy saying here
     """
     init_config(ctx, debug=debug, verbosity=verbosity, silent=silent)
-
-    # if ctx.obj.schema_store:
-    #     schema_msg = "Schema loaded successfully."
-    # else:
-    #     schema_msg = "No schema found. Try `esi-link schema update`."
-
-    # welcome = f"""
-    # Welcome to Esi Link! Your CLI interface to the Eve Online ESI api.
-    # Application data located at {CONFIG.app_dir}
-    # Schema status: {schema_msg}
-    # """
-    # if not ctx.obj.silent:
-    #     typer.echo(welcome)
+    console = Console()
+    console.print("[bold]Welcome to esi-auth, a tool for managing EVE SSO tokens.")
 
     if ctx.obj.verbosity > 1:
         typer.echo("CLI configuration:")
@@ -99,6 +88,12 @@ def init_config(
     start = perf_counter_ns()
     settings = get_settings()
     token_path = settings.token_store_dir / settings.token_file_name
+
+    if not token_path.is_file():
+        token_store = TokenStoreJson.init_store(token_path)
+    else:
+        token_store = TokenStoreJson(token_path)
+
     config = CliConfig(
         app_name=settings.app_name,
         version=metadata.version("esi-auth"),
@@ -106,7 +101,7 @@ def init_config(
         debug=debug,
         verbosity=verbosity,
         silent=silent,
-        token_store=TokenStoreJson(token_path),
+        token_store=token_store,
     )
     ctx.obj = config
 
@@ -116,3 +111,4 @@ def version(ctx: typer.Context):
     """Display version information."""
     console = Console()
     console.print(f"{ctx.obj.app_name} version {ctx.obj.version}")
+    console.print(f"App directory: {get_settings().app_dir}")

@@ -201,6 +201,27 @@ class TokenStoreJson(TokenStorageProtocol):
             logger.error(error_msg)
             raise TokenStorageError(error_msg, self.storage_path) from e
 
+    @classmethod
+    def init_store(cls, storage_path: Path) -> "TokenStoreJson":
+        """Initialize the token store, creating an empty file if needed.
+
+        Args:
+            storage_path: Optional custom path for token storage.
+
+        Returns:
+            An instance of TokenStoreJson.
+        """
+        if storage_path.is_file():
+            logger.info(f"File already exists at: {storage_path}")
+            raise TokenStorageError(
+                f"File already exists at: {storage_path}", storage_path
+            )
+        store = cls(storage_path)
+        characters = AuthenticatedCharacters()
+        store._save_characters(characters)
+        logger.info(f"Initialized new token store at: {storage_path}")
+        return store
+
     def add_character(self, token: CharacterToken) -> None:
         """Add or update a character's token in storage.
 

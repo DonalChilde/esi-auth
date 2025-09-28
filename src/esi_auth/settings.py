@@ -207,6 +207,14 @@ class SettingsManager:
 
         return self._settings
 
+    def reset(self) -> None:
+        """Reset the settings manager, clearing cached settings.
+
+        This is primarily useful for testing scenarios where you need
+        to reload settings with different parameters.
+        """
+        self._settings = None
+
 
 def get_settings(**kwargs: dict[str, Any]) -> EsiAuthSettings:
     """Get the current application settings.

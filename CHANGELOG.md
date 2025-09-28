@@ -1,8 +1,10 @@
 # Changelog
+
 <!-- markdownlint-disable MD024 -->
 <!-- changelog-begin -->
 
-## [Unreleased](<https://github.com/REPO_OWNER/PROJECT_NAME/compare/0.1.0...dev>)
+## [Unreleased](https://github.com/DonalChilde/esi-auth/compare/0.1.0...dev)
+
 <!-- Dont forget to:
     - Update the Unreleased compare version to latest release tag
     - Update compare/_previous_version_tag_

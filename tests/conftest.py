@@ -23,5 +23,9 @@ def load_env():
     if not env_file:
         pytest.fail("Could not find .test.env file for loading environment variables.")
     load_dotenv(env_file, override=True)
-    get_settings(_env_prefix="ESI_AUTH_TEST_")  # type: ignore
+    # get_settings(_env_prefix="ESI_AUTH_TEST_")  # type: ignore
     logger.info("Loaded test environment variables from .test.env")
+
+
+# TODO make a fixture for a test output directory
+# TODO make a fixture to inject the app_dir env setting

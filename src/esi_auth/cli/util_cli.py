@@ -24,6 +24,9 @@ class AppConfig(TypedDict):
     scopes: list[str]
 
 
+# TODO combine app settings and oauth metadata with env generation.
+
+
 @app.command()
 def parse_app_json(
     file_in: Annotated[Path, typer.Argument(..., exists=True, dir_okay=False)],
@@ -48,13 +51,13 @@ def parse_app_json(
     callback_url = CallbackUrl.parse(app_config["callbackUrl"])
 
     env_lines = [
-        f'CLIENT_ID="{app_config["clientId"]}"',
-        f'CLIENT_SECRET="{app_config["clientSecret"]}"',
+        f'ESI_AUTH_CLIENT_ID="{app_config["clientId"]}"',
+        f'ESI_AUTH_CLIENT_SECRET="{app_config["clientSecret"]}"',
         "# Note: The scopes must be a string representing a JSON array of strings.",
-        f"SCOPES='{json.dumps(app_config['scopes'])}'",
-        f'CALLBACK_HOST="{callback_url.callback_host}"',
-        f'CALLBACK_PORT="{callback_url.callback_port}"',
-        f'CALLBACK_ROUTE="{callback_url.callback_route}"',
+        f"ESI_AUTH_SCOPES='{json.dumps(app_config['scopes'])}'",
+        f'ESI_AUTH_CALLBACK_HOST="{callback_url.callback_host}"',
+        f'ESI_AUTH_CALLBACK_PORT="{callback_url.callback_port}"',
+        f'ESI_AUTH_CALLBACK_ROUTE="{callback_url.callback_route}"',
     ]
     text_out = "\n".join(env_lines) + "\n"
     console.print("# The following lines can be placed in the .env file:")
@@ -206,10 +209,10 @@ def parse_oauth_metadata():
     console.rule("[bold green]Environment Variables")
     console.print("# The following lines can be placed in the .env file:")
     env_lines = [
-        f'OAUTH2_AUTHORIZATION_ENDPOINT="{oauth_metadata.get("authorization_endpoint", "Unknown")}"',
-        f'OAUTH2_TOKEN_ENDPOINT="{oauth_metadata.get("token_endpoint", "Unknown")}"',
-        f'OAUTH2_JWKS_URI="{oauth_metadata.get("jwks_uri", "Unknown")}"',
-        f'OAUTH2_ISSUER="{oauth_metadata.get("issuer", "Unknown")}"',
+        f'ESI_AUTH_OAUTH2_AUTHORIZATION_ENDPOINT="{oauth_metadata.get("authorization_endpoint", "Unknown")}"',
+        f'ESI_AUTH_OAUTH2_TOKEN_ENDPOINT="{oauth_metadata.get("token_endpoint", "Unknown")}"',
+        f'ESI_AUTH_OAUTH2_JWKS_URI="{oauth_metadata.get("jwks_uri", "Unknown")}"',
+        f'ESI_AUTH_OAUTH2_ISSUER="{oauth_metadata.get("issuer", "Unknown")}"',
     ]
     text_out = "\n".join(env_lines) + "\n"
     console.print(text_out, no_wrap=True, crop=False, overflow="ignore")

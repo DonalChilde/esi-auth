@@ -1,8 +1,13 @@
 from dataclasses import dataclass
+from importlib import metadata
 from time import perf_counter_ns
 from typing import Annotated
 
 import typer
+from rich.console import Console
+
+from esi_auth.settings import get_settings
+from esi_auth.storage import TokenStorageProtocol, TokenStoreJson
 
 from .auth_cli import app as auth_app
 from .token_store_cli import app as token_store_app
@@ -20,30 +25,36 @@ app.add_typer(util_app, name="util", help="Utility commands.")
 @dataclass
 class CliConfig:
     app_name: str = "NOT SET"
+    version: str = "NOT SET"
     start_time: int = perf_counter_ns()
     debug: bool = False
     verbosity: int = 1
     silent: bool = False
+    token_store: TokenStorageProtocol | None = None
 
     def __repr__(self) -> str:
         return (
             f"CliConfig("
-            f"app_name={self.app_name}, "
-            f"start_time={self.start_time}, "
-            f"debug={self.debug}, "
-            f"verbosity={self.verbosity}, "
-            f"silent={self.silent}"
+            f"app_name={self.app_name!r}, "
+            f"version={self.version!r}, "
+            f"start_time={self.start_time!r}, "
+            f"debug={self.debug!r}, "
+            f"verbosity={self.verbosity!r}, "
+            f"silent={self.silent!r}, "
+            f"token_store={self.token_store!r}"
             ")"
         )
 
     def __str__(self) -> str:
         return (
             f"CliConfig:\n"
-            f" app_name={self.app_name}\n"
-            f" start_time={self.start_time}\n"
-            f" debug={self.debug}\n"
-            f" verbosity={self.verbosity}\n"
-            f" silent={self.silent}"
+            f" \tapp_name={self.app_name}\n"
+            f" \tversion={self.version}\n"
+            f" \tstart_time={self.start_time}\n"
+            f" \tdebug={self.debug}\n"
+            f" \tverbosity={self.verbosity}\n"
+            f" \tsilent={self.silent}\n"
+            f" \ttoken_store={self.token_store}"
         )
 
 
@@ -61,12 +72,7 @@ def default_options(
 
     Insert pithy saying here
     """
-    ctx.ensure_object(CliConfig)
-    ctx.obj.start_time = perf_counter_ns()
-    ctx.obj.debug = debug
-    ctx.obj.verbosity = verbosity
-    ctx.obj.silent = silent
-    init_config(ctx)
+    init_config(ctx, debug=debug, verbosity=verbosity, silent=silent)
 
     # if ctx.obj.schema_store:
     #     schema_msg = "Schema loaded successfully."
@@ -89,6 +95,27 @@ def default_options(
         # typer.echo(f"{indent_lines(str(CONFIG), indent=2)}")
 
 
-def init_config(ctx: typer.Context) -> None:
+def init_config(
+    ctx: typer.Context, *, debug: bool, verbosity: int, silent: bool
+) -> None:
     """Initialize configuration based on CLI options."""
-    pass
+    start = perf_counter_ns()
+    settings = get_settings()
+    token_path = settings.token_store_dir / settings.token_file_name
+    config = CliConfig(
+        app_name=settings.app_name,
+        version=metadata.version("esi-auth"),
+        start_time=start,
+        debug=debug,
+        verbosity=verbosity,
+        silent=silent,
+        token_store=TokenStoreJson(token_path),
+    )
+    ctx.obj = config
+
+
+@app.command()
+def version(ctx: typer.Context):
+    """Display version information."""
+    console = Console()
+    console.print(f"{ctx.obj.app_name} version {ctx.obj.version}")

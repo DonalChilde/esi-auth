@@ -23,9 +23,10 @@ app = typer.Typer(no_args_is_help=True)
 
 
 @app.command()
-def add():
+def add(ctx: typer.Context):
     """Add an authorized character."""
     console = Console()
+    console.rule("[bold blue]Add Authorized Character[/bold blue]")
     settings = get_settings()
     if settings.client_id == "Unknown":
         console.print(
@@ -38,20 +39,22 @@ def add():
     jwks_client = PyJWKClient(settings.jwks_uri)
     auth_params = create_auth_params(jwks_client=jwks_client)
     sso_url, state = get_sso_url(auth_params=auth_params, scopes=settings.scopes)
-    logger.info(f"Attempting to add character authorization use the following url.")
+    logger.info(f"Attempting to add character authorization using the following url.")
     logger.info(f"{sso_url}")
-
-    console.print(f"Please visit the following URL to authorize the application:")
+    console.print()
+    console.print(f"Your web browser should automatically open to the Eve login page.")
+    console.print(f"If it does not, try clicking on the link below:")
     console.print(f"[blue]Click Here[/blue]", style=f"link {sso_url}")
-    console.print("See logs for url details.")
+    console.print("See logs for full URL details.")
     webbrowser.open_new(sso_url)
     character = _authenticate_character(
         auth_params=auth_params, sso_url=sso_url, state=state
     )
-    console.print(f"Successfully authorized character: {character.character_name}")
-    console.print(f"{character}")
-
-    # TODO implement store_character
+    console.print(
+        f"Successfully authorized character: {character.character_name}",
+        style="bold green",
+    )
+    ctx.obj.token_store.add_character(character)
 
 
 def _authenticate_character(

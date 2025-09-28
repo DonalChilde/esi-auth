@@ -124,3 +124,103 @@ class CharacterToken(BaseModel):
         """
         buffer_time = self.expires_at.subtract(minutes=buffer_minutes)
         return Instant.now() >= buffer_time
+
+
+class AuthenticatedCharacters(BaseModel):
+    """Container for all authenticated characters' tokens.
+
+    This model manages the collection of authenticated characters and provides
+    methods for accessing and modifying the token data.
+    """
+
+    characters: dict[int, CharacterToken] = Field(
+        default_factory=dict[int, CharacterToken],
+        description="Dictionary mapping character_id to CharacterToken",
+    )
+    last_updated: Instant = Field(
+        default_factory=_get_current_instant,
+        description="When this collection was last modified",
+    )
+
+    def add_character(self, token: CharacterToken) -> None:
+        """Add or update a character's token data.
+
+        Updates the last_updated timestamp to reflect the modification.
+
+        Args:
+            token: The CharacterToken to add or update.
+        """
+        self.characters[token.character_id] = token
+        self.last_updated = Instant.now()
+
+    def remove_character(self, character_id: int) -> bool:
+        """Remove a character from the collection.
+
+        Updates the last_updated timestamp if a character was removed.
+
+        Args:
+            character_id: The character ID to remove.
+
+        Returns:
+            True if character was removed, False if not found.
+        """
+        if character_id in self.characters:
+            del self.characters[character_id]
+            self.last_updated = Instant.now()
+            return True
+        return False
+
+    def get_character(self, character_id: int) -> CharacterToken | None:
+        """Retrieve a character's token data.
+
+        Args:
+            character_id: The character ID to retrieve.
+
+        Returns:
+            CharacterToken if found, None otherwise.
+        """
+        return self.characters.get(character_id)
+
+    def list_characters(self) -> list[CharacterToken]:
+        """Get a list of all authenticated characters.
+
+        Returns:
+            List of all CharacterToken instances in the collection.
+        """
+        return list(self.characters.values())
+
+    def has_character(self, character_id: int) -> bool:
+        """Check if a character exists in the collection.
+
+        Args:
+            character_id: The character ID to check.
+
+        Returns:
+            True if character exists, False otherwise.
+        """
+        return character_id in self.characters
+
+    def get_expired_tokens(self) -> list[CharacterToken]:
+        """Get list of characters with expired tokens.
+
+        Returns:
+            List of CharacterToken objects with expired access tokens.
+        """
+        return [token for token in self.characters.values() if token.is_expired()]
+
+    def get_tokens_needing_refresh(
+        self, buffer_minutes: int = 5
+    ) -> list[CharacterToken]:
+        """Get list of characters whose tokens need refreshing.
+
+        Args:
+            buffer_minutes: Minutes before expiry to consider needing refresh.
+
+        Returns:
+            List of CharacterToken objects that should be refreshed.
+        """
+        return [
+            token
+            for token in self.characters.values()
+            if token.needs_refresh(buffer_minutes)
+        ]

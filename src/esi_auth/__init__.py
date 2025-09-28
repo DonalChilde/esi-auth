@@ -7,8 +7,13 @@ __version__ = "0.1.0"
 
 import logging
 
+from .api import get_authorized_characters
 from .logging_config import setup_logging
 from .settings import get_settings
+
+__all__ = [
+    "get_authorized_characters",
+]
 
 setup_logging(log_dir=get_settings().log_dir)
 logger = logging.getLogger(__name__)

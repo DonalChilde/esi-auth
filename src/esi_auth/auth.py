@@ -8,6 +8,7 @@ objects.
 
 """
 
+import asyncio
 import logging
 from collections.abc import Sequence
 from dataclasses import dataclass
@@ -238,16 +239,56 @@ async def refresh_character(
     client_session: aiohttp.ClientSession,
 ) -> CharacterToken:
     """Refresh an access token using the provided refresh token."""
-    refresh_token = await AH.do_refresh_token(
-        refresh_token=character_token.refresh_token,
-        client_id=auth_params.client_id,
-        token_endpoint=auth_params.token_endpoint,
-        user_agent=auth_params.user_agent,
-        client_session=client_session,
-    )
-    validated_token = validate_token(auth_params, refresh_token["access_token"])
-    new_character_token = character_token_from_validated_token(
-        validated_token, refresh_token
-    )
+    try:
+        refresh_token = await AH.do_refresh_token(
+            refresh_token=character_token.refresh_token,
+            client_id=auth_params.client_id,
+            token_endpoint=auth_params.token_endpoint,
+            user_agent=auth_params.user_agent,
+            client_session=client_session,
+        )
+        validated_token = validate_token(auth_params, refresh_token["access_token"])
+        new_character_token = character_token_from_validated_token(
+            validated_token, refresh_token
+        )
+    except Exception as e:
+        logger.error(
+            f"Error refreshing token for character {character_token.character_id}: {e}"
+        )
+        raise TokenRefreshError(
+            message=str(e),
+            character_id=int(character_token.character_id),
+            error_code=getattr(e, "error_code", None),
+        ) from e
 
     return new_character_token
+
+
+async def refresh_multiple_characters(
+    auth_params: AuthParams,
+    character_tokens: Sequence[CharacterToken],
+) -> list[CharacterToken | TokenRefreshError]:
+    """Refresh multiple character tokens concurrently.
+
+    Args:
+        auth_params: The authentication parameters.
+        character_tokens: A sequence of CharacterToken instances to refresh.
+
+    Returns:
+        A dictionary mapping character IDs to their refreshed CharacterToken instances.
+    """
+    refreshed_tokens: list[CharacterToken | TokenRefreshError] = []
+    async with aiohttp.ClientSession() as client_session:
+        tasks = [
+            refresh_character(auth_params, token, client_session)
+            for token in character_tokens
+        ]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+
+    for result in results:
+        if isinstance(result, Exception):
+            refreshed_tokens.append(result)
+        else:
+            refreshed_tokens.append(result)
+
+    return refreshed_tokens

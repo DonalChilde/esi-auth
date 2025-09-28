@@ -1,9 +1,15 @@
+import asyncio
 import logging
 from pathlib import Path
 from typing import Protocol
 
 from pydantic import ValidationError
 
+from esi_auth.auth import (
+    TokenRefreshError,
+    create_auth_params,
+    refresh_multiple_characters,
+)
 from esi_auth.models import AuthenticatedCharacters, CharacterToken
 from esi_auth.settings import get_settings
 
@@ -59,6 +65,21 @@ class TokenStorageProtocol(Protocol):
         """
         ...
 
+    def refresh_characters(
+        self, characters: list[CharacterToken]
+    ) -> tuple[list[int], list[int]]:
+        """Refresh multiple characters' token data.
+
+        Args:
+            characters: A list of CharacterToken instances to refresh.
+
+        Returns:
+            A tuple containing two lists:
+                - List of character IDs successfully refreshed.
+                - List of character IDs that failed to refresh.
+        """
+        ...
+
     def list_characters(self) -> list[CharacterToken]:
         """List all stored characters.
 
@@ -79,6 +100,8 @@ class TokenStorageProtocol(Protocol):
         self, buffer_minutes: int = 5
     ) -> list[CharacterToken]:
         """List all characters whose tokens need refreshing.
+
+        This includes tokens that are about to expire within the specified buffer time.
 
         Args:
             buffer_minutes: The buffer time in minutes before actual expiration to consider for refresh.
@@ -250,6 +273,62 @@ class TokenStoreJson(TokenStorageProtocol):
 
         characters = self._load_characters()
         return characters.list_characters()
+
+    def refresh_characters(
+        self, characters: list[CharacterToken]
+    ) -> tuple[list[int], list[int]]:
+        """Refresh multiple characters' token data.
+
+        Args:
+            characters: A list of CharacterToken instances to refresh.
+
+        Returns:
+            A tuple containing two lists:
+                - List of character IDs successfully refreshed.
+                - List of character IDs that failed to refresh.
+
+        Raises:
+            TokenStorageError: If the operation fails.
+        """
+        success: list[CharacterToken] = []
+        failure: list[Exception] = []
+        logger.debug(f"Refreshing {len(characters)} characters")
+        auth_params = create_auth_params()
+        refreshed_tokens = asyncio.run(
+            refresh_multiple_characters(auth_params, characters)
+        )
+        for token in refreshed_tokens:
+            if isinstance(token, Exception):
+                logger.error(
+                    f"Failed to refresh token: {token.character_id} - {token.message}"
+                )
+                failure.append(token)
+            elif isinstance(token, CharacterToken):  # pyright: ignore[reportUnnecessaryIsInstance]
+                logger.debug(
+                    f"Refreshed character {token.character_id} ({token.character_name})"
+                )
+                success.append(token)
+            else:
+                raise ValueError(f"Unexpected type in refreshed tokens: {type(token)}")
+        for token in success:
+            # Update storage with refreshed token
+            self.add_character(token)
+
+        for token in refreshed_tokens:
+            if isinstance(token, TokenRefreshError):
+                logger.error(
+                    f"Failed to refresh token: {token.character_id} - {token.message}"
+                )
+
+        if len(success) < len(characters):
+            logger.warning(
+                f"Refreshed {len(success)}/{len(characters)} characters successfully"
+            )
+        success_ids = [t.character_id for t in success]
+        failure_ids = [
+            t.character_id for t in failure if isinstance(t, TokenRefreshError)
+        ]
+        return (success_ids, failure_ids)
 
     def list_expired_characters(self) -> list[CharacterToken]:
         """List all characters with expired tokens.

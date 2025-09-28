@@ -9,8 +9,9 @@ import typer
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-APPLICATION_NAME = "pfmsoft-esi-auth"
-DEFAULT_APP_DIR = Path(typer.get_app_dir(APPLICATION_NAME))
+NAMESPACE = "pfmsoft"
+APPLICATION_NAME = "esi-auth"
+DEFAULT_APP_DIR = Path(typer.get_app_dir(f"{NAMESPACE}-{APPLICATION_NAME}"))
 
 
 class EsiAuthSettings(BaseSettings):

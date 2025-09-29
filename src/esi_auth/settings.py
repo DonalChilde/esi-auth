@@ -59,6 +59,14 @@ class EsiAuthSettings(BaseSettings):
         default="character_tokens.json",
         description="Filename for storing character tokens",
     )
+    credential_store_dir: Path = Field(
+        default=DEFAULT_APP_DIR / "credential-store",
+        description="Directory for storing credential files",
+    )
+    credential_file_name: str = Field(
+        default="app_credentials.json",
+        description="Filename for storing application credentials",
+    )
 
     # HTTP client configuration
     request_timeout: int = Field(
@@ -158,6 +166,7 @@ class EsiAuthSettings(BaseSettings):
         self.app_dir.mkdir(parents=True, exist_ok=True)
         self.log_dir.mkdir(parents=True, exist_ok=True)
         self.token_store_dir.mkdir(parents=True, exist_ok=True)
+        self.credential_store_dir.mkdir(parents=True, exist_ok=True)
 
     @field_validator("scopes", mode="before")
     @classmethod
@@ -169,7 +178,7 @@ class EsiAuthSettings(BaseSettings):
             except ValueError:
                 pass
         if isinstance(v, list):
-            return v
+            return v  # pyright: ignore[reportUnknownVariableType]
         raise ValueError("Invalid format for scopes")
 
 

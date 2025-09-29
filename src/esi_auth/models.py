@@ -82,6 +82,106 @@ class VerifiedToken(BaseModel):
     )
 
 
+class EveCredentials(BaseModel):
+    """EVE SSO application credentials.
+
+    This model holds the client ID and secret required for OAuth2 authentication
+    with the EVE Online SSO service.
+    """
+
+    name: str = Field(..., description="The name of the application")
+    client_id: str = Field(..., description="The OAuth2 client ID")
+    client_secret: str = Field(..., description="The OAuth2 client secret")
+    callback_host: str = Field(
+        default="localhost", description="Host for OAuth callback server"
+    )
+    callback_port: int = Field(
+        default=8080, description="Port for OAuth callback server"
+    )
+    callback_route: str = Field(
+        default="/callback", description="Route for OAuth callback"
+    )
+    scopes: list[str] = Field(
+        default_factory=lambda: ["publicData"],
+        description="Default OAuth2 scopes for authentication",
+    )
+
+
+class CredentialStore(BaseModel):
+    """Container for multiple EVE application credentials.
+
+    This model manages a collection of EVE application credentials, allowing
+    for easy access and modification of stored credentials.
+    """
+
+    credentials: dict[str, EveCredentials] = Field(
+        default_factory=dict,
+        description="Dictionary mapping client_id to EveCredentials",
+    )
+    last_updated: Instant = Field(
+        default_factory=_get_current_instant,
+        description="When this collection was last modified",
+    )
+
+    def add_credential(self, cred: EveCredentials) -> None:
+        """Add or update an application's credentials.
+
+        Updates the last_updated timestamp to reflect the modification.
+
+        Args:
+            cred: The EveCredentials to add or update.
+        """
+        self.credentials[cred.client_id] = cred
+        self.last_updated = Instant.now()
+
+    def remove_credential(self, client_id: str) -> bool:
+        """Remove an application's credentials by client_id.
+
+        Updates the last_updated timestamp if a credential was removed.
+
+        Args:
+            client_id: The client_id of the application to remove.
+
+        Returns:
+            True if credential was removed, False if not found.
+        """
+        if client_id in self.credentials:
+            del self.credentials[client_id]
+            self.last_updated = Instant.now()
+            return True
+        return False
+
+    def get_credential(self, client_id: str) -> EveCredentials | None:
+        """Retrieve an application's credentials by client_id.
+
+        Args:
+            client_id: The client_id of the application to retrieve.
+
+        Returns:
+            EveCredentials if found, None otherwise.
+        """
+        return self.credentials.get(client_id)
+
+    def list_credentials(self) -> list[EveCredentials]:
+        """Get a list of all stored application credentials.
+
+        Returns:
+            List of all EveCredentials instances in the collection.
+        """
+        return list(self.credentials.values())
+
+    def has_credential(self, client_id: str) -> bool:
+        """Check if an application's credentials exist in the collection.
+
+        Args:
+            client_id: The client_id of the application to check.
+
+        Returns:
+            True if credentials exist, False otherwise.
+        """
+        return client_id in self.credentials
+
+
 class CharacterToken(BaseModel):
     """Represents an authenticated character's token data.
 

@@ -142,7 +142,7 @@ class TokenStoreJson(TokenStorageProtocol):
         Raises:
             TokenStorageError: If file exists but cannot be loaded or parsed.
         """
-        if not self.storage_path.exists():
+        if not self.storage_path.is_file():
             logger.info(f"Token file does not exist: {self.storage_path}")
             return AuthenticatedCharacters()
 
@@ -150,10 +150,8 @@ class TokenStoreJson(TokenStorageProtocol):
             logger.debug(f"Loading characters from: {self.storage_path}")
             with open(self.storage_path, encoding="utf-8") as f:
                 data = AuthenticatedCharacters.model_validate_json(f.read())
-
-            characters = AuthenticatedCharacters.model_validate(data)
-            logger.info(f"Loaded {len(characters.characters)} characters from storage")
-            return characters
+            logger.info(f"Loaded {len(data.characters)} characters from storage")
+            return data
 
         except ValidationError as e:
             error_msg = f"Validation error in token file: {e}"

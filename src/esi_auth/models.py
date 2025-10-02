@@ -90,6 +90,7 @@ class EveCredentials(BaseModel):
     """
 
     name: str = Field(..., description="The name of the application")
+    alias: str | None = Field(None, description="Unique alias for the application")
     client_id: str = Field(..., description="The OAuth2 client ID")
     client_secret: str = Field(..., description="The OAuth2 client secret")
     callback_host: str = Field(

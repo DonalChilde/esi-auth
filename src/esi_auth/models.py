@@ -91,16 +91,17 @@ class EveCredentials(BaseModel):
 
     name: str = Field(..., description="The name of the application")
     alias: str | None = Field(None, description="Unique alias for the application")
-    client_id: str = Field(..., description="The OAuth2 client ID")
-    client_secret: str = Field(..., description="The OAuth2 client secret")
-    callback_host: str = Field(
-        default="localhost", description="Host for OAuth callback server"
+    client_id: str = Field(
+        ...,
+        description="The OAuth2 client ID",
     )
-    callback_port: int = Field(
-        default=8080, description="Port for OAuth callback server"
+    client_secret: str = Field(
+        ...,
+        description="The OAuth2 client secret",
     )
-    callback_route: str = Field(
-        default="/callback", description="Route for OAuth callback"
+    callback_url: str = Field(
+        ...,
+        description="The full callback URL",
     )
     scopes: list[str] = Field(
         default_factory=lambda: ["publicData"],

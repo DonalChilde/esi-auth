@@ -16,6 +16,7 @@ from esi_auth.auth import (
     create_auth_params,
     get_sso_url,
 )
+from esi_auth.credential_storage import CredentialStoreJson
 from esi_auth.settings import get_settings
 
 logger = logging.getLogger(__name__)
@@ -24,23 +25,54 @@ app = typer.Typer(no_args_is_help=True)
 
 
 @app.command()
-def add(ctx: typer.Context):
+def add(
+    ctx: typer.Context,
+    client_id: Annotated[
+        str | None,
+        typer.Option(
+            "-i",
+            "--client-id",
+            help="Client ID to use for authorization. Either the client ID or client alias must be provided.",
+        ),
+    ] = None,
+    client_alias: Annotated[
+        str | None,
+        typer.Option(
+            "-a",
+            "--client-alias",
+            help="Alias for the client ID to use for authorization. Either the client ID or client alias must be provided.",
+        ),
+    ] = None,
+):
     """Add an authorized character to the token store."""
+    if all([client_id, client_alias]):
+        typer.echo("Error: Specify either client ID or client alias, not both.")
+        raise typer.Exit(code=1)
+    if not any([client_id, client_alias]):
+        typer.echo("Error: Either client ID or client alias must be specified.")
+        raise typer.Exit(code=1)
     console = Console()
     console.rule("[bold blue]Add Authorized Character[/bold blue]")
     settings = get_settings()
-    if settings.client_id == "Unknown":
+    credential_store = get_credential_store()
+    if client_alias:
+        credentials = credential_store.get_credentials_by_alias(client_alias)
+    elif client_id:
+        credentials = credential_store.get_credentials(client_id)
+    else:
+        raise typer.Exit(code=1)  # This should never happen due to earlier checks
+    if not credentials:
         console.print(
-            f"Client ID must be set in settings. You can place it in the .env file "
-            f"located in the project data directory: {settings.app_dir}.",
+            f"Credentials not found for "
+            f"{f'alias {client_alias}' if client_alias else f'client ID {client_id}'}.",
             style="bold red",
         )
         raise typer.Exit(code=1)
 
     jwks_client = PyJWKClient(settings.jwks_uri)
-    auth_params = create_auth_params(jwks_client=jwks_client)
-    console.print(settings.scopes)
-    sso_url, state = get_sso_url(auth_params=auth_params, scopes=settings.scopes)
+    auth_params = create_auth_params(credentials=credentials, jwks_client=jwks_client)
+    console.print(credentials.scopes)
+    sso_url, state = get_sso_url(auth_params=auth_params, scopes=credentials.scopes)
     logger.info(f"Attempting to add character authorization using the following url.")
     logger.info(f"{sso_url}")
     console.print()
@@ -60,6 +92,14 @@ def add(ctx: typer.Context):
     console.print(
         f"Character {character.character_name} added to token store.",
         style="bold green",
+    )
+
+
+def get_credential_store():
+    """Get the credential store instance."""
+    settings = get_settings()
+    return CredentialStoreJson(
+        settings.credential_store_dir / settings.credential_file_name
     )
 
 

@@ -48,11 +48,14 @@ class CredentialStorageProtocol(Protocol):
         """
         ...
 
-    def remove_credentials(self, credentials: EveCredentials) -> bool:
+    def remove_credentials(self, client_id: str) -> bool:
         """Remove the given credentials from storage.
 
         Args:
-            credentials: The EveCredentials instance to remove.
+            client_id: The client_id of the EveCredentials instance to remove.
+
+        Raises:
+            CredentialStorageError: If saving after removal fails.
 
         Returns:
             True if the credentials were removed, False otherwise.
@@ -64,6 +67,20 @@ class CredentialStorageProtocol(Protocol):
 
         Args:
             client_id: The client_id of the application to retrieve.
+
+        Returns:
+            The EveCredentials instance if found, else None.
+
+        Raises:
+            CredentialStorageError: If retrieval fails.
+        """
+        ...
+
+    def get_credentials_by_alias(self, alias: str) -> EveCredentials | None:
+        """Retrieve credentials by alias.
+
+        Args:
+            alias: The alias of the application to retrieve.
 
         Returns:
             The EveCredentials instance if found, else None.
@@ -169,24 +186,25 @@ class CredentialStoreJson(CredentialStorageProtocol):
         existing_store.credentials[credentials.client_id] = credentials
         self._save_credentials(existing_store)
 
-    def remove_credentials(self, credentials: EveCredentials) -> bool:
+    def remove_credentials(self, client_id: str) -> bool:
         """Remove the given credentials from storage.
 
         Args:
-            credentials: The EveCredentials instance to remove.
+            client_id: The client_id of the EveCredentials instance to remove.
 
         Raises:
-            CredentialStorageError: If removal fails.
+            CredentialStorageError: If saving after removal fails.
+
+        Returns:
+            True if the credentials were removed, False otherwise.
         """
-        logger.debug(f"Removing credentials for client_id: {credentials.client_id}")
+        logger.debug(f"Removing credentials for client_id: {client_id}")
         existing_store = self._load_credentials()
-        removed = existing_store.remove_credential(credentials.client_id)
+        removed = existing_store.remove_credential(client_id)
         if removed:
             self._save_credentials(existing_store)
         else:
-            logger.warning(
-                f"Credentials for client_id {credentials.client_id} not found"
-            )
+            logger.warning(f"Credentials for client_id {client_id} not found")
         return removed
 
     def get_credentials(self, client_id: str) -> EveCredentials | None:
@@ -204,6 +222,25 @@ class CredentialStoreJson(CredentialStorageProtocol):
         logger.debug(f"Retrieving credentials for client_id: {client_id}")
         existing_store = self._load_credentials()
         return existing_store.credentials.get(client_id)
+
+    def get_credentials_by_alias(self, alias: str) -> EveCredentials | None:
+        """Retrieve credentials by alias.
+
+        Args:
+            alias: The alias of the application to retrieve.
+
+        Returns:
+            The EveCredentials instance if found, else None.
+
+        Raises:
+            CredentialStorageError: If retrieval fails.
+        """
+        logger.debug(f"Retrieving credentials for alias: {alias}")
+        existing_store = self._load_credentials()
+        for cred in existing_store.credentials.values():
+            if cred.alias == alias:
+                return cred
+        return None
 
     def list_credentials(self) -> list[EveCredentials]:
         """List all stored credentials.

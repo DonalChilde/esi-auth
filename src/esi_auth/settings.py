@@ -1,12 +1,11 @@
 """Application settings for esi-auth."""
 
-import json
 from collections.abc import Sequence
 from pathlib import Path
 from typing import Any, ClassVar
 
 import typer
-from pydantic import Field, field_validator
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 NAMESPACE = "pfmsoft"
@@ -78,18 +77,18 @@ class EsiAuthSettings(BaseSettings):
     ############################################################################
 
     # OAuth2 credentials
-    client_id: str = Field(
-        default="NOT_SET",
-        description="EVE Online application client ID from developers.eveonline.com",
-    )
-    client_secret: str = Field(
-        default="NOT_SET",
-        description="EVE Online application client secret from developers.eveonline.com",
-    )
-    scopes: list[str] = Field(
-        default=["publicData"],
-        description="Default OAuth2 scopes for authentication",
-    )
+    # client_id: str = Field(
+    #     default="NOT_SET",
+    #     description="EVE Online application client ID from developers.eveonline.com",
+    # )
+    # client_secret: str = Field(
+    #     default="NOT_SET",
+    #     description="EVE Online application client secret from developers.eveonline.com",
+    # )
+    # scopes: list[str] = Field(
+    #     default=["publicData"],
+    #     description="Default OAuth2 scopes for authentication",
+    # )
 
     # ESI API configuration
     esi_base_url: str = Field(
@@ -130,17 +129,17 @@ class EsiAuthSettings(BaseSettings):
     )
 
     # Callback url settings
-    callback_host: str = Field(
-        default="localhost", description="Host for OAuth callback server"
-    )
+    # callback_host: str = Field(
+    #     default="localhost", description="Host for OAuth callback server"
+    # )
 
-    callback_port: int = Field(
-        default=8080, description="Port for OAuth callback server"
-    )
+    # callback_port: int = Field(
+    #     default=8080, description="Port for OAuth callback server"
+    # )
 
-    callback_route: str = Field(
-        default="/callback", description="Route for OAuth callback server"
-    )
+    # callback_route: str = Field(
+    #     default="/callback", description="Route for OAuth callback server"
+    # )
 
     ############################################################################
     # User agent configuration
@@ -168,18 +167,18 @@ class EsiAuthSettings(BaseSettings):
         self.token_store_dir.mkdir(parents=True, exist_ok=True)
         self.credential_store_dir.mkdir(parents=True, exist_ok=True)
 
-    @field_validator("scopes", mode="before")
-    @classmethod
-    def json_decode(cls, v: Any) -> list[str]:
-        """Decode JSON string to list if necessary."""
-        if isinstance(v, str):
-            try:
-                return json.loads(v)
-            except ValueError:
-                pass
-        if isinstance(v, list):
-            return v  # pyright: ignore[reportUnknownVariableType]
-        raise ValueError("Invalid format for scopes")
+    # @field_validator("scopes", mode="before")
+    # @classmethod
+    # def json_decode(cls, v: Any) -> list[str]:
+    #     """Decode JSON string to list if necessary."""
+    #     if isinstance(v, str):
+    #         try:
+    #             return json.loads(v)
+    #         except ValueError:
+    #             pass
+    #     if isinstance(v, list):
+    #         return v  # pyright: ignore[reportUnknownVariableType]
+    #     raise ValueError("Invalid format for scopes")
 
 
 class SettingsManager:

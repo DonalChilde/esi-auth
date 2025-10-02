@@ -22,7 +22,7 @@ from esi_auth.models import CallbackUrl
 
 from . import auth_helpers as AH
 from .helpers import get_user_agent
-from .models import CharacterToken
+from .models import CharacterToken, EveCredentials
 from .settings import get_settings
 
 USER_AGENT = get_user_agent()
@@ -87,11 +87,13 @@ class AuthParams:
 
 
 def create_auth_params(
+    credentials: EveCredentials,
     jwks_client: PyJWKClient | None = None,
 ) -> AuthParams:
     """Create authentication parameters from current settings.
 
     Args:
+        credentials: The EveCredentials instance containing client info.
         jwks_client: Optional PyJWKClient instance. If None, a new one will be created.
 
     Returns:
@@ -101,15 +103,12 @@ def create_auth_params(
     if jwks_client is None:
         jwks_client = PyJWKClient(settings.jwks_uri)
     code_verifier, code_challenge = AH.generate_code_challenge()
+    callback_url = CallbackUrl.parse(credentials.callback_url)
     return AuthParams(
-        client_id=settings.client_id,
+        client_id=credentials.client_id,
         token_endpoint=settings.token_endpoint,
         authorization_endpoint=settings.authorization_endpoint,
-        callback_url=CallbackUrl(
-            callback_host=settings.callback_host,
-            callback_port=settings.callback_port,
-            callback_route=settings.callback_route,
-        ),
+        callback_url=callback_url,
         jwks_client=jwks_client,
         audience=settings.oauth2_audience,
         issuer=settings.oauth2_issuer,
@@ -267,7 +266,7 @@ async def refresh_character(
 async def refresh_multiple_characters(
     auth_params: AuthParams,
     character_tokens: Sequence[CharacterToken],
-) -> list[CharacterToken | TokenRefreshError]:
+) -> list[CharacterToken | Exception]:
     """Refresh multiple character tokens concurrently.
 
     Args:
@@ -277,7 +276,7 @@ async def refresh_multiple_characters(
     Returns:
         A dictionary mapping character IDs to their refreshed CharacterToken instances.
     """
-    refreshed_tokens: list[CharacterToken | TokenRefreshError] = []
+    refreshed_tokens: list[CharacterToken | Exception] = []
     async with aiohttp.ClientSession() as client_session:
         tasks = [
             refresh_character(auth_params, token, client_session)
@@ -289,6 +288,6 @@ async def refresh_multiple_characters(
         if isinstance(result, Exception):
             refreshed_tokens.append(result)
         else:
-            refreshed_tokens.append(result)
+            refreshed_tokens.append(result)  # pyright: ignore[reportArgumentType]
 
     return refreshed_tokens

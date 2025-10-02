@@ -7,7 +7,7 @@ import typer
 from rich.console import Console
 
 from esi_auth.settings import get_settings
-from esi_auth.storage import TokenStorageProtocol, TokenStoreJson
+from esi_auth.token_storage import TokenStorageProtocol, TokenStoreJson
 
 from .credentials import app as credentials_app
 from .token_store_cli import app as token_store_app

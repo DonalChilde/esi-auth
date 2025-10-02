@@ -4,7 +4,7 @@ import logging
 
 from esi_auth.models import CharacterToken
 from esi_auth.settings import get_settings
-from esi_auth.storage import TokenStoreJson
+from esi_auth.token_storage import TokenStoreJson
 
 logger = logging.getLogger(__name__)
 

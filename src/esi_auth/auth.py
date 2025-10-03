@@ -86,6 +86,73 @@ class AuthParams:
     code_challenge: str
 
 
+@dataclass(slots=True)
+class AuthState:
+    """State information for initial authentication and token exchange."""
+
+    code_verifier: str
+    code_challenge: str
+    state: str
+    sso_url: str
+
+
+@dataclass(slots=True)
+class OauthParams:
+    """OAuth2 parameters required for authentication and validation."""
+
+    token_endpoint: str
+    authorization_endpoint: str
+    audience: str
+    issuer: Sequence[str]
+    jwks_uri: str
+
+
+def get_oauth_params() -> OauthParams:
+    settings = get_settings()
+    return OauthParams(
+        token_endpoint=settings.token_endpoint,
+        authorization_endpoint=settings.authorization_endpoint,
+        audience=settings.oauth2_audience,
+        issuer=settings.oauth2_issuer,
+        jwks_uri=settings.jwks_uri,
+    )
+
+
+def get_auth_state(
+    credentials: EveCredentials,
+    oauth_params: OauthParams,
+    scopes: Sequence[str] | None = None,
+) -> AuthState:
+    code_verifier, code_challenge = AH.generate_code_challenge()
+    if scopes is None:
+        scopes = credentials.scopes
+    else:
+        for scope in scopes:
+            if scope not in credentials.scopes:
+                raise ValueError(
+                    f"Requested scope '{scope}' not in allowed scopes: {credentials.scopes}"
+                )
+    sso_url, state = AH.redirect_to_sso(
+        client_id=credentials.client_id,
+        redirect_uri=credentials.callback_url,
+        scopes=scopes or [],
+        authorization_endpoint=oauth_params.authorization_endpoint,
+        challenge=code_challenge,
+    )
+    return AuthState(
+        code_verifier=code_verifier,
+        code_challenge=code_challenge,
+        state=state,
+        sso_url=sso_url,
+    )
+
+
+# new thoughts on param passing:
+# - Credentials
+# - oauth_params - endpoints, audience, issuer, jwks_uri
+# - code_verifier, code_challenge, state, sso_url - These only needed for initial auth
+
+
 def create_auth_params(
     credentials: EveCredentials,
     jwks_client: PyJWKClient | None = None,
@@ -99,6 +166,7 @@ def create_auth_params(
     Returns:
         AuthParams: The authentication parameters.
     """
+    # TODO split this logic into one for getting auth code, and one for getting and refreshing tokens.
     settings = get_settings()
     if jwks_client is None:
         jwks_client = PyJWKClient(settings.jwks_uri)

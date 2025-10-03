@@ -16,8 +16,13 @@ from esi_auth.auth import (
     create_auth_params,
     get_sso_url,
 )
-from esi_auth.credential_storage import CredentialStoreJson
+from esi_auth.credential_storage import (
+    CredentialStorageProtocol,
+    get_credential_store,
+)
+from esi_auth.models import EveCredentials
 from esi_auth.settings import get_settings
+from esi_auth.token_storage import get_token_store
 
 logger = logging.getLogger(__name__)
 
@@ -45,29 +50,16 @@ def add(
     ] = None,
 ):
     """Add an authorized character to the token store."""
-    if all([client_id, client_alias]):
-        typer.echo("Error: Specify either client ID or client alias, not both.")
-        raise typer.Exit(code=1)
-    if not any([client_id, client_alias]):
-        typer.echo("Error: Either client ID or client alias must be specified.")
-        raise typer.Exit(code=1)
     console = Console()
     console.rule("[bold blue]Add Authorized Character[/bold blue]")
     settings = get_settings()
     credential_store = get_credential_store()
-    if client_alias:
-        credentials = credential_store.get_credentials_by_alias(client_alias)
-    elif client_id:
-        credentials = credential_store.get_credentials(client_id)
-    else:
-        raise typer.Exit(code=1)  # This should never happen due to earlier checks
-    if not credentials:
-        console.print(
-            f"Credentials not found for "
-            f"{f'alias {client_alias}' if client_alias else f'client ID {client_id}'}.",
-            style="bold red",
-        )
-        raise typer.Exit(code=1)
+    # Checks for client_id/client_alias presence and mutual exclusivity
+    credentials = get_credentials_from_store(
+        credential_store=credential_store,
+        client_id=client_id,
+        client_alias=client_alias,
+    )
 
     jwks_client = PyJWKClient(settings.jwks_uri)
     auth_params = create_auth_params(credentials=credentials, jwks_client=jwks_client)
@@ -88,27 +80,48 @@ def add(
         f"Successfully authorized character: {character.character_name}",
         style="bold green",
     )
-    ctx.obj.token_store.add_character(character)
+    token_store = get_token_store()
+    token_store.add_character(credentials.client_id, character)
     console.print(
-        f"Character {character.character_name} added to token store.",
+        f"Character {character.character_name} added to token store for client {credentials.alias}.",
         style="bold green",
     )
 
 
-def get_credential_store():
-    """Get the credential store instance."""
-    settings = get_settings()
-    return CredentialStoreJson(
-        settings.credential_store_dir / settings.credential_file_name
-    )
-
-
 @app.command()
-def remove(ctx: typer.Context, character_id: int):
+def remove(
+    ctx: typer.Context,
+    character_id: int,
+    client_id: Annotated[
+        str | None,
+        typer.Option(
+            "-i",
+            "--client-id",
+            help="Client ID to use for authorization. Either the client ID or client alias must be provided.",
+        ),
+    ] = None,
+    client_alias: Annotated[
+        str | None,
+        typer.Option(
+            "-a",
+            "--client-alias",
+            help="Alias for the client ID to use for authorization. Either the client ID or client alias must be provided.",
+        ),
+    ] = None,
+):
     """Remove an authorized character."""
     console = Console()
     console.rule("[bold blue]Remove Authorized Character[/bold blue]")
-    character = ctx.obj.token_store.get_character(character_id)
+
+    credential_store = get_credential_store()
+    # Checks for client_id/client_alias presence and mutual exclusivity
+    credentials = get_credentials_from_store(
+        credential_store=credential_store,
+        client_id=client_id,
+        client_alias=client_alias,
+    )
+    token_store = get_token_store()
+    character = token_store.get_character(credentials.client_id, character_id)
     if not character:
         console.print(
             f"Character with ID {character_id} not found.",
@@ -116,9 +129,9 @@ def remove(ctx: typer.Context, character_id: int):
         )
         raise typer.Exit(code=1)
 
-    ctx.obj.token_store.remove_character(character_id)
+    token_store.remove_character(credentials.client_id, character_id)
     console.print(
-        f"Character {character.character_name} removed from token store.",
+        f"Character {character.character_name} removed from token store for client {credentials.alias}.",
         style="bold green",
     )
 
@@ -126,6 +139,22 @@ def remove(ctx: typer.Context, character_id: int):
 @app.command()
 def list(
     ctx: typer.Context,
+    client_id: Annotated[
+        str | None,
+        typer.Option(
+            "-i",
+            "--client-id",
+            help="Client ID to use for authorization. Either the client ID or client alias must be provided.",
+        ),
+    ] = None,
+    client_alias: Annotated[
+        str | None,
+        typer.Option(
+            "-a",
+            "--client-alias",
+            help="Alias for the client ID to use for authorization. Either the client ID or client alias must be provided.",
+        ),
+    ] = None,
     buffer_minutes: Annotated[
         int,
         typer.Option(
@@ -139,7 +168,16 @@ def list(
     console = Console()
     console.rule("[bold blue]Authorized Characters[/bold blue]")
 
-    characters = ctx.obj.token_store.list_characters()
+    credential_store = get_credential_store()
+    # Checks for client_id/client_alias presence and mutual exclusivity
+    credentials = get_credentials_from_store(
+        credential_store=credential_store,
+        client_id=client_id,
+        client_alias=client_alias,
+    )
+
+    token_store = get_token_store()
+    characters = token_store.list_characters(client_id=credentials.client_id)
 
     if not characters:
         console.print("No authorized characters found.", style="yellow")
@@ -180,9 +218,58 @@ def list(
     console.print(f"\nTotal characters: {len(characters)}")
 
 
+def get_credentials_from_store(
+    credential_store: CredentialStorageProtocol,
+    client_id: str | None,
+    client_alias: str | None,
+) -> EveCredentials:
+    """Helper to get credential and token stores and validate client info."""
+    console = Console()
+    if all([client_id, client_alias]):
+        console.print(
+            "Error: Specify either client ID or client alias, not both.",
+            style="bold red",
+        )
+        raise typer.Exit(code=1)
+    if not any([client_id, client_alias]):
+        console.print(
+            "Error: Either client ID or client alias must be specified.",
+            style="bold red",
+        )
+        raise typer.Exit(code=1)
+    if client_alias:
+        credentials = credential_store.get_credentials_by_alias(client_alias)
+    else:
+        credentials = credential_store.get_credentials(client_id)  # pyright: ignore[reportArgumentType]
+    if not credentials:
+        console.print(
+            f"Credentials not found for "
+            f"{f'alias {client_alias}' if client_alias else f'client ID {client_id}'}.",
+            style="bold red",
+        )
+        raise typer.Exit(code=1)
+    return credentials
+
+
 @app.command()
 def refresh(
     ctx: typer.Context,
+    client_id: Annotated[
+        str | None,
+        typer.Option(
+            "-i",
+            "--client-id",
+            help="Client ID to use for authorization. Either the client ID or client alias must be provided.",
+        ),
+    ] = None,
+    client_alias: Annotated[
+        str | None,
+        typer.Option(
+            "-a",
+            "--client-alias",
+            help="Alias for the client ID to use for authorization. Either the client ID or client alias must be provided.",
+        ),
+    ] = None,
     character_id: Annotated[
         int | None,
         typer.Option(
@@ -191,7 +278,7 @@ def refresh(
     ] = None,
     all_characters: Annotated[
         bool,
-        typer.Option("-a", "--all", help="Refresh tokens for all characters."),
+        typer.Option("--all", help="Refresh tokens for all characters."),
     ] = False,
     expired_only: Annotated[
         bool,
@@ -240,10 +327,20 @@ def refresh(
             style="bold red",
         )
         raise typer.Exit(code=1)
+    credential_store = get_credential_store()
+    # Checks for client_id/client_alias presence and mutual exclusivity
+    credentials = get_credentials_from_store(
+        credential_store=credential_store,
+        client_id=client_id,
+        client_alias=client_alias,
+    )
+    token_store = get_token_store()
 
     # Determine which characters to refresh
     if character_id:
-        character = ctx.obj.token_store.get_character(character_id)
+        character = token_store.get_character(
+            client_id=credentials.client_id, character_id=character_id
+        )
         if not character:
             console.print(
                 f"Character with ID {character_id} not found.",
@@ -253,20 +350,25 @@ def refresh(
         characters_to_refresh = [character]
         refresh_type = f"character {character_id}"
     elif all_characters:
-        characters_to_refresh = ctx.obj.token_store.list_characters()
+        characters_to_refresh = token_store.list_characters(
+            client_id=credentials.client_id
+        )
         refresh_type = "all characters"
     elif expired_only:
-        characters_to_refresh = ctx.obj.token_store.list_expired_characters()
+        characters_to_refresh = token_store.list_expired_characters(
+            client_id=credentials.client_id
+        )
         refresh_type = "expired characters"
     elif expiring_only:
-        characters_to_refresh = ctx.obj.token_store.list_characters_needing_refresh(
-            buffer_minutes
+        characters_to_refresh = token_store.list_characters_needing_refresh(
+            client_id=credentials.client_id,
+            buffer_minutes=buffer_minutes,
         )
         refresh_type = f"characters expiring within {buffer_minutes} minutes"
     else:
         # Default: refresh characters needing refresh
-        characters_to_refresh = ctx.obj.token_store.list_characters_needing_refresh(
-            buffer_minutes
+        characters_to_refresh = token_store.list_characters_needing_refresh(
+            client_id=credentials.client_id, buffer_minutes=buffer_minutes
         )
         refresh_type = f"characters needing refresh (within {buffer_minutes} minutes)"
 
@@ -284,8 +386,8 @@ def refresh(
         if not confirm:
             console.print("Operation cancelled.", style="yellow")
             return
-    success_ids, failure_ids = ctx.obj.token_store.refresh_characters(
-        characters_to_refresh
+    success_ids, failure_ids = token_store.refresh_characters(
+        client_id=credentials.client_id, characters=characters_to_refresh
     )
     if failure_ids:
         console.print(

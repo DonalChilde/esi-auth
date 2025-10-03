@@ -254,3 +254,11 @@ class CredentialStoreJson(CredentialStorageProtocol):
         logger.debug("Listing all stored credentials")
         existing_store = self._load_credentials()
         return list(existing_store.credentials.values())
+
+
+def get_credential_store():
+    """Get the credential store instance."""
+    settings = get_settings()
+    return CredentialStoreJson(
+        settings.credential_store_dir / settings.credential_file_name
+    )

@@ -7,7 +7,7 @@ import typer
 from rich.console import Console
 
 from esi_auth.settings import get_settings
-from esi_auth.token_storage import TokenStorageProtocol, TokenStoreJson
+from esi_auth.token_storage import TokenStoreJson
 
 from .credentials import app as credentials_app
 from .token_store_cli import app as token_store_app
@@ -31,7 +31,6 @@ class CliConfig:
     debug: bool = False
     verbosity: int = 1
     silent: bool = False
-    token_store: TokenStorageProtocol | None = None
 
     def __repr__(self) -> str:
         return (
@@ -42,7 +41,6 @@ class CliConfig:
             f"debug={self.debug!r}, "
             f"verbosity={self.verbosity!r}, "
             f"silent={self.silent!r}, "
-            f"token_store={self.token_store!r}"
             ")"
         )
 
@@ -54,8 +52,7 @@ class CliConfig:
             f" \tstart_time={self.start_time}\n"
             f" \tdebug={self.debug}\n"
             f" \tverbosity={self.verbosity}\n"
-            f" \tsilent={self.silent}\n"
-            f" \ttoken_store={self.token_store}"
+            f" \tsilent={self.silent}"
         )
 
 
@@ -94,9 +91,7 @@ def init_config(
     token_path = settings.token_store_dir / settings.token_file_name
 
     if not token_path.is_file():
-        token_store = TokenStoreJson.init_store(token_path)
-    else:
-        token_store = TokenStoreJson(token_path)
+        TokenStoreJson.init_store(token_path)
 
     config = CliConfig(
         app_name=settings.app_name,
@@ -105,7 +100,6 @@ def init_config(
         debug=debug,
         verbosity=verbosity,
         silent=silent,
-        token_store=token_store,
     )
     ctx.obj = config
 

@@ -122,6 +122,7 @@ def generate_example_env(
     ] = "ESI_AUTH_",
 ):
     """Generate an example .env file with placeholder values."""
+    # TODO update this for post auth settings purge.
     console = Console()
     console.rule("[bold green]Generate Example .env File")
     # Check if file exists and handle overwrite

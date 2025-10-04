@@ -2,6 +2,7 @@
 
 import logging
 
+from esi_auth.credential_storage import get_credential_store
 from esi_auth.models import CharacterToken
 from esi_auth.settings import get_settings
 from esi_auth.token_storage import TokenStoreJson
@@ -9,7 +10,11 @@ from esi_auth.token_storage import TokenStoreJson
 logger = logging.getLogger(__name__)
 
 
-def get_authorized_characters(buffer_minutes: int = 5) -> dict[int, CharacterToken]:
+def get_authorized_characters(
+    client_id: str | None = None,
+    client_alias: str | None = None,
+    buffer_minutes: int = 5,
+) -> dict[int, CharacterToken]:
     """Get a list of all authorized characters.
 
     The function checks for tokens that are close to expiration (within the
@@ -29,6 +34,21 @@ def get_authorized_characters(buffer_minutes: int = 5) -> dict[int, CharacterTok
     Raises:
         TokenStorageError: If the operation fails.
     """
+    # FIXME move retrival of credentials by alisas or id to credential store module.
+    # FIXME Include exception handling for not found, both specified, neither specified.
+    if client_id and client_alias:
+        raise ValueError("Specify either client_id or client_alias, not both.")
+    if not any([client_id, client_alias]):
+        raise ValueError("Either client_id or client_alias must be specified.")
+    credential_store = get_credential_store()
+    if client_alias:
+        credentials = credential_store.get_credentials_by_alias(client_alias)
+    else:
+        credentials = credential_store.get_credentials(client_id)  # pyright: ignore[reportArgumentType]
+    if credentials is None:
+        raise ValueError(
+            "No credentials found for the specified client_id or client_alias."
+        )
     if buffer_minutes < 0:
         raise ValueError("buffer_minutes must be non-negative")
     if buffer_minutes > 15:
@@ -38,15 +58,17 @@ def get_authorized_characters(buffer_minutes: int = 5) -> dict[int, CharacterTok
     token_store_path = settings.token_store_dir / settings.token_file_name
     token_store = TokenStoreJson(storage_path=token_store_path)
     refresh_list = token_store.list_characters_needing_refresh(
-        buffer_minutes=buffer_minutes
+        credentials=credentials, buffer_minutes=buffer_minutes
     )
     if refresh_list:
         logger.info(f"Refreshing {len(refresh_list)} tokens before returning list")
-        success_ids, failure_ids = token_store.refresh_characters(refresh_list)
+        success_ids, failure_ids = token_store.refresh_characters(
+            credentials=credentials, characters=refresh_list
+        )
         _ = success_ids  # Unused variable
         if failure_ids:
             logger.warning(f"Failed to refresh tokens for character IDs: {failure_ids}")
             # TODO: Consider raising an exception or handling failures differently
-    characters = token_store.list_characters()
+    characters = token_store.list_characters(credentials=credentials)
     character_dict = {char.character_id: char for char in characters}
     return character_dict

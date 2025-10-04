@@ -6,16 +6,11 @@ import webbrowser
 from typing import Annotated
 
 import typer
-from jwt import PyJWKClient
 from rich.console import Console
 from rich.table import Table
 from whenever import Instant
 
-from esi_auth.auth import (
-    authenticate_character,
-    create_auth_params,
-    get_sso_url,
-)
+from esi_auth.auth import authenticate_character, get_auth_state, get_oauth_params
 from esi_auth.credential_storage import (
     CredentialStorageProtocol,
     get_credential_store,
@@ -60,28 +55,29 @@ def add(
         client_id=client_id,
         client_alias=client_alias,
     )
-
-    jwks_client = PyJWKClient(settings.jwks_uri)
-    auth_params = create_auth_params(credentials=credentials, jwks_client=jwks_client)
-    console.print(credentials.scopes)
-    sso_url, state = get_sso_url(auth_params=auth_params, scopes=credentials.scopes)
+    oauth_params = get_oauth_params(settings=settings)
+    auth_state = get_auth_state(
+        credentials=credentials, oauth_params=oauth_params, scopes=credentials.scopes
+    )
     logger.info(f"Attempting to add character authorization using the following url.")
-    logger.info(f"{sso_url}")
+    logger.info(f"{auth_state.sso_url}")
     console.print()
     console.print(f"Your web browser should automatically open to the Eve login page.")
     console.print(f"If it does not, try clicking on the link below:")
-    console.print(f"[blue]Click Here[/blue]", style=f"link {sso_url}")
+    console.print(f"[blue]Click Here[/blue]", style=f"link {auth_state.sso_url}")
     console.print("See logs for full URL details.")
-    webbrowser.open_new(sso_url)
+    webbrowser.open_new(auth_state.sso_url)
     character = asyncio.run(
-        authenticate_character(auth_params=auth_params, sso_url=sso_url, state=state)
+        authenticate_character(
+            credentials=credentials, oauth_params=oauth_params, auth_state=auth_state
+        )
     )
     console.print(
         f"Successfully authorized character: {character.character_name}",
         style="bold green",
     )
     token_store = get_token_store()
-    token_store.add_character(credentials.client_id, character)
+    token_store.add_character(credentials=credentials, character_token=character)
     console.print(
         f"Character {character.character_name} added to token store for client {credentials.alias}.",
         style="bold green",
@@ -121,7 +117,9 @@ def remove(
         client_alias=client_alias,
     )
     token_store = get_token_store()
-    character = token_store.get_character(credentials.client_id, character_id)
+    character = token_store.get_character(
+        credentials=credentials, character_id=character_id
+    )
     if not character:
         console.print(
             f"Character with ID {character_id} not found.",
@@ -129,7 +127,7 @@ def remove(
         )
         raise typer.Exit(code=1)
 
-    token_store.remove_character(credentials.client_id, character_id)
+    token_store.remove_character(credentials=credentials, character_id=character_id)
     console.print(
         f"Character {character.character_name} removed from token store for client {credentials.alias}.",
         style="bold green",
@@ -177,7 +175,7 @@ def list(
     )
 
     token_store = get_token_store()
-    characters = token_store.list_characters(client_id=credentials.client_id)
+    characters = token_store.list_characters(credentials=credentials)
 
     if not characters:
         console.print("No authorized characters found.", style="yellow")
@@ -339,7 +337,7 @@ def refresh(
     # Determine which characters to refresh
     if character_id:
         character = token_store.get_character(
-            client_id=credentials.client_id, character_id=character_id
+            credentials=credentials, character_id=character_id
         )
         if not character:
             console.print(
@@ -350,25 +348,23 @@ def refresh(
         characters_to_refresh = [character]
         refresh_type = f"character {character_id}"
     elif all_characters:
-        characters_to_refresh = token_store.list_characters(
-            client_id=credentials.client_id
-        )
+        characters_to_refresh = token_store.list_characters(credentials=credentials)
         refresh_type = "all characters"
     elif expired_only:
         characters_to_refresh = token_store.list_expired_characters(
-            client_id=credentials.client_id
+            credentials=credentials
         )
         refresh_type = "expired characters"
     elif expiring_only:
         characters_to_refresh = token_store.list_characters_needing_refresh(
-            client_id=credentials.client_id,
+            credentials=credentials,
             buffer_minutes=buffer_minutes,
         )
         refresh_type = f"characters expiring within {buffer_minutes} minutes"
     else:
         # Default: refresh characters needing refresh
         characters_to_refresh = token_store.list_characters_needing_refresh(
-            client_id=credentials.client_id, buffer_minutes=buffer_minutes
+            credentials=credentials, buffer_minutes=buffer_minutes
         )
         refresh_type = f"characters needing refresh (within {buffer_minutes} minutes)"
 
@@ -387,7 +383,7 @@ def refresh(
             console.print("Operation cancelled.", style="yellow")
             return
     success_ids, failure_ids = token_store.refresh_characters(
-        client_id=credentials.client_id, characters=characters_to_refresh
+        credentials=credentials, characters=characters_to_refresh
     )
     if failure_ids:
         console.print(

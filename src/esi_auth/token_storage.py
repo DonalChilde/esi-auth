@@ -9,11 +9,10 @@ from pydantic import ValidationError
 
 from esi_auth.auth import (
     TokenRefreshError,
-    create_auth_params,
+    get_oauth_params,
     refresh_multiple_characters,
 )
-from esi_auth.credential_storage import get_credential_store
-from esi_auth.models import AuthenticatedCharacters, CharacterToken
+from esi_auth.models import AuthenticatedCharacters, CharacterToken, EveCredentials
 from esi_auth.settings import get_settings
 
 logger = logging.getLogger(__name__)
@@ -38,20 +37,22 @@ class TokenStorageError(Exception):
 
 
 class TokenStorageProtocol(Protocol):
-    def add_character(self, client_id: str, token: CharacterToken) -> None:
+    def add_character(
+        self, credentials: EveCredentials, character_token: CharacterToken
+    ) -> None:
         """Add or update a character's token data.
 
         Args:
-            client_id: The client_id associated with the character.
-            token: The CharacterToken to add or update.
+            credentials: The EveCredentials associated with the character.
+            character_token: The CharacterToken to add or update.
         """
         ...
 
-    def remove_character(self, client_id: str, character_id: int) -> bool:
+    def remove_character(self, credentials: EveCredentials, character_id: int) -> bool:
         """Remove a character from storage.
 
         Args:
-            client_id: The client_id associated with the character.
+            credentials: The EveCredentials associated with the character.
             character_id: The character ID to remove.
 
         Returns:
@@ -59,11 +60,13 @@ class TokenStorageProtocol(Protocol):
         """
         ...
 
-    def get_character(self, client_id: str, character_id: int) -> CharacterToken | None:
+    def get_character(
+        self, credentials: EveCredentials, character_id: int
+    ) -> CharacterToken | None:
         """Get a specific character's token from storage.
 
         Args:
-            client_id: The client_id associated with the character.
+            credentials: The EveCredentials associated with the character.
             character_id: The character ID to retrieve.
 
         Returns:
@@ -72,12 +75,12 @@ class TokenStorageProtocol(Protocol):
         ...
 
     def refresh_characters(
-        self, client_id: str, characters: list[CharacterToken]
+        self, credentials: EveCredentials, characters: list[CharacterToken]
     ) -> tuple[list[int], list[int]]:
         """Refresh multiple characters' token data.
 
         Args:
-            client_id: The client_id associated with the characters.
+            credentials: The EveCredentials associated with the characters.
             characters: A list of CharacterToken instances to refresh.
 
         Returns:
@@ -87,22 +90,24 @@ class TokenStorageProtocol(Protocol):
         """
         ...
 
-    def list_characters(self, client_id: str) -> list[CharacterToken]:
+    def list_characters(self, credentials: EveCredentials) -> list[CharacterToken]:
         """List all stored characters.
 
         Args:
-            client_id: The client_id associated with the characters.
+            credentials: The EveCredentials associated with the characters.
 
         Returns:
             A list of all CharacterToken instances in storage.
         """
         ...
 
-    def list_expired_characters(self, client_id: str) -> list[CharacterToken]:
+    def list_expired_characters(
+        self, credentials: EveCredentials
+    ) -> list[CharacterToken]:
         """List all characters with expired tokens.
 
         Args:
-            client_id: The client_id associated with the characters.
+            credentials: The EveCredentials associated with the characters.
 
         Returns:
             A list of CharacterToken instances whose access tokens have expired.
@@ -110,14 +115,14 @@ class TokenStorageProtocol(Protocol):
         ...
 
     def list_characters_needing_refresh(
-        self, client_id: str, buffer_minutes: int = 5
+        self, credentials: EveCredentials, buffer_minutes: int = 5
     ) -> list[CharacterToken]:
         """List all characters whose tokens need refreshing.
 
         This includes tokens that are about to expire within the specified buffer time.
 
         Args:
-            client_id: The client_id associated with the characters.
+            credentials: The EveCredentials associated with the characters.
             buffer_minutes: The buffer time in minutes before actual expiration to consider for refresh.
 
         Returns:
@@ -234,29 +239,31 @@ class TokenStoreJson(TokenStorageProtocol):
         logger.info(f"Initialized new token store at: {storage_path}")
         return store
 
-    def add_character(self, client_id: str, token: CharacterToken) -> None:
+    def add_character(
+        self, credentials: EveCredentials, character_token: CharacterToken
+    ) -> None:
         """Add or update a character's token in storage.
 
         Args:
-            client_id: The client_id associated with the character.
-            token: The CharacterToken to add or update.
+            credentials: The EveCredentials associated with the character.
+            character_token: The CharacterToken to add or update.
 
         Raises:
             TokenStorageError: If the operation fails.
         """
         logger.debug(
-            f"Adding/updating character {token.character_id} ({token.character_name})"
+            f"Adding/updating character {character_token.character_id} ({character_token.character_name})"
         )
 
         characters = self._load_characters()
-        characters.add_character(client_id, token)
+        characters.add_character(credentials.client_id, character_token)
         self._save_characters(characters)
 
-    def remove_character(self, client_id: str, character_id: int) -> bool:
+    def remove_character(self, credentials: EveCredentials, character_id: int) -> bool:
         """Remove a character from storage.
 
         Args:
-            client_id: The client_id associated with the character.
+            credentials: The EveCredentials associated with the character.
             character_id: The character ID to remove.
 
         Returns:
@@ -268,7 +275,7 @@ class TokenStoreJson(TokenStorageProtocol):
         logger.debug(f"Removing character {character_id}")
 
         characters = self._load_characters()
-        removed = characters.remove_character(client_id, character_id)
+        removed = characters.remove_character(credentials.client_id, character_id)
 
         if removed:
             self._save_characters(characters)
@@ -278,11 +285,13 @@ class TokenStoreJson(TokenStorageProtocol):
 
         return removed
 
-    def get_character(self, client_id: str, character_id: int) -> CharacterToken | None:
+    def get_character(
+        self, credentials: EveCredentials, character_id: int
+    ) -> CharacterToken | None:
         """Get a specific character's token from storage.
 
         Args:
-            client_id: The client_id associated with the character.
+            credentials: The EveCredentials associated with the character.
             character_id: The character ID to retrieve.
 
         Returns:
@@ -294,13 +303,13 @@ class TokenStoreJson(TokenStorageProtocol):
         logger.debug(f"Retrieving character {character_id}")
 
         characters = self._load_characters()
-        return characters.get_character(client_id, character_id)
+        return characters.get_character(credentials.client_id, character_id)
 
-    def list_characters(self, client_id: str) -> list[CharacterToken]:
+    def list_characters(self, credentials: EveCredentials) -> list[CharacterToken]:
         """List all characters in storage.
 
         Args:
-            client_id: The client_id associated with the characters.
+            credentials: The EveCredentials associated with the characters.
 
         Returns:
             List of all CharacterToken objects.
@@ -311,15 +320,15 @@ class TokenStoreJson(TokenStorageProtocol):
         logger.debug("Listing all characters")
 
         characters = self._load_characters()
-        return characters.list_characters(client_id)
+        return characters.list_characters(credentials.client_id)
 
     def refresh_characters(
-        self, client_id: str, characters: list[CharacterToken]
+        self, credentials: EveCredentials, characters: list[CharacterToken]
     ) -> tuple[list[int], list[int]]:
         """Refresh multiple characters' token data.
 
         Args:
-            client_id: The client_id associated with the characters.
+            credentials: The EveCredentials associated with the characters.
             characters: A list of CharacterToken instances to refresh.
 
         Returns:
@@ -330,17 +339,16 @@ class TokenStoreJson(TokenStorageProtocol):
         Raises:
             TokenStorageError: If the operation fails.
         """
-        # TODO refactor to use credentials parameter instead of client_id
-
         success: list[CharacterToken] = []
         failure: list[Exception] = []
         logger.debug(f"Refreshing {len(characters)} characters")
-        credentials = get_credential_store().get_credentials(client_id)
-        if not credentials:
-            raise TokenStorageError(f"No credentials found for client_id: {client_id}")
-        auth_params = create_auth_params(credentials=credentials)
+        oauth_params = get_oauth_params()
         refreshed_tokens = asyncio.run(
-            refresh_multiple_characters(auth_params, characters)
+            refresh_multiple_characters(
+                credentials=credentials,
+                oauth_params=oauth_params,
+                character_tokens=characters,
+            )
         )
         for token in refreshed_tokens:
             if isinstance(token, Exception):
@@ -355,7 +363,7 @@ class TokenStoreJson(TokenStorageProtocol):
                 raise ValueError(f"Unexpected type in refreshed tokens: {type(token)}")
         for token in success:
             # Update storage with refreshed token
-            self.add_character(client_id=credentials.client_id, token=token)
+            self.add_character(credentials=credentials, character_token=token)
 
         for token in refreshed_tokens:
             if isinstance(token, TokenRefreshError):
@@ -373,11 +381,13 @@ class TokenStoreJson(TokenStorageProtocol):
         ]
         return (success_ids, failure_ids)
 
-    def list_expired_characters(self, client_id: str) -> list[CharacterToken]:
+    def list_expired_characters(
+        self, credentials: EveCredentials
+    ) -> list[CharacterToken]:
         """List all characters with expired tokens.
 
         Args:
-            client_id: The client_id associated with the characters.
+            credentials: The EveCredentials associated with the characters.
 
         Returns:
             A list of CharacterToken instances whose access tokens have expired.
@@ -385,15 +395,15 @@ class TokenStoreJson(TokenStorageProtocol):
         logger.debug("Listing expired characters")
 
         characters = self._load_characters()
-        return characters.get_expired_tokens(client_id=client_id)
+        return characters.get_expired_tokens(client_id=credentials.client_id)
 
     def list_characters_needing_refresh(
-        self, client_id: str, buffer_minutes: int = 5
+        self, credentials: EveCredentials, buffer_minutes: int = 5
     ) -> list[CharacterToken]:
         """List all characters whose tokens need refreshing.
 
         Args:
-            client_id: The client_id associated with the characters.
+            credentials: The EveCredentials associated with the characters.
             buffer_minutes: The buffer time in minutes before actual expiration to consider for refresh.
 
         Returns:
@@ -404,7 +414,7 @@ class TokenStoreJson(TokenStorageProtocol):
         )
         characters = self._load_characters()
         return characters.get_tokens_needing_refresh(
-            client_id=client_id, buffer_minutes=buffer_minutes
+            client_id=credentials.client_id, buffer_minutes=buffer_minutes
         )
 
 

@@ -23,13 +23,15 @@ from esi_auth.models import CallbackUrl
 from . import auth_helpers as AH
 from .helpers import get_user_agent
 from .models import CharacterToken, EveCredentials
-from .settings import get_settings
+from .settings import EsiAuthSettings, get_settings
 
 USER_AGENT = get_user_agent()
 
 
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
+
+# TODO move exception generation to auth_helpers, and ensure consistent usage.
 
 
 class AuthenticationError(Exception):
@@ -72,18 +74,18 @@ class TokenRefreshError(Exception):
         self.error_code = error_code
 
 
-@dataclass
-class AuthParams:
-    client_id: str
-    token_endpoint: str
-    authorization_endpoint: str
-    callback_url: CallbackUrl
-    jwks_client: PyJWKClient
-    audience: str
-    issuer: Sequence[str]
-    user_agent: str
-    code_verifier: str
-    code_challenge: str
+# @dataclass
+# class AuthParams:
+#     client_id: str
+#     token_endpoint: str
+#     authorization_endpoint: str
+#     callback_url: CallbackUrl
+#     jwks_client: PyJWKClient
+#     audience: str
+#     issuer: Sequence[str]
+#     user_agent: str
+#     code_verifier: str
+#     code_challenge: str
 
 
 @dataclass(slots=True)
@@ -94,6 +96,7 @@ class AuthState:
     code_challenge: str
     state: str
     sso_url: str
+    authorization_code: str | None = None
 
 
 @dataclass(slots=True)
@@ -107,8 +110,9 @@ class OauthParams:
     jwks_uri: str
 
 
-def get_oauth_params() -> OauthParams:
-    settings = get_settings()
+def get_oauth_params(settings: EsiAuthSettings | None = None) -> OauthParams:
+    """Retrieve OAuth2 parameters from settings."""
+    settings = get_settings() if settings is None else settings
     return OauthParams(
         token_endpoint=settings.token_endpoint,
         authorization_endpoint=settings.authorization_endpoint,
@@ -123,6 +127,19 @@ def get_auth_state(
     oauth_params: OauthParams,
     scopes: Sequence[str] | None = None,
 ) -> AuthState:
+    """Generate the AuthState for the initial authentication flow.
+
+    Creates the code verifier, code challenge, state, and SSO URL.
+
+    Args:
+        credentials: The EveCredentials instance containing client info.
+        oauth_params: The OauthParams instance containing OAuth2 parameters.
+        scopes: Optional sequence of scopes to request. Must be a subset of credentials.scopes.
+            If None, uses credentials.scopes.
+
+    Returns:
+        AuthState: The generated authentication state.
+    """
     code_verifier, code_challenge = AH.generate_code_challenge()
     if scopes is None:
         scopes = credentials.scopes
@@ -139,6 +156,8 @@ def get_auth_state(
         authorization_endpoint=oauth_params.authorization_endpoint,
         challenge=code_challenge,
     )
+    logger.info(f"Generated SSO URL: {sso_url} with state: {state}")
+
     return AuthState(
         code_verifier=code_verifier,
         code_challenge=code_challenge,
@@ -153,104 +172,165 @@ def get_auth_state(
 # - code_verifier, code_challenge, state, sso_url - These only needed for initial auth
 
 
-def create_auth_params(
-    credentials: EveCredentials,
-    jwks_client: PyJWKClient | None = None,
-) -> AuthParams:
-    """Create authentication parameters from current settings.
+# def create_auth_params(
+#     credentials: EveCredentials,
+#     jwks_client: PyJWKClient | None = None,
+# ) -> AuthParams:
+#     """Create authentication parameters from current settings.
 
-    Args:
-        credentials: The EveCredentials instance containing client info.
-        jwks_client: Optional PyJWKClient instance. If None, a new one will be created.
+#     Args:
+#         credentials: The EveCredentials instance containing client info.
+#         jwks_client: Optional PyJWKClient instance. If None, a new one will be created.
 
-    Returns:
-        AuthParams: The authentication parameters.
-    """
-    # TODO split this logic into one for getting auth code, and one for getting and refreshing tokens.
-    settings = get_settings()
-    if jwks_client is None:
-        jwks_client = PyJWKClient(settings.jwks_uri)
-    code_verifier, code_challenge = AH.generate_code_challenge()
-    callback_url = CallbackUrl.parse(credentials.callback_url)
-    return AuthParams(
-        client_id=credentials.client_id,
-        token_endpoint=settings.token_endpoint,
-        authorization_endpoint=settings.authorization_endpoint,
-        callback_url=callback_url,
-        jwks_client=jwks_client,
-        audience=settings.oauth2_audience,
-        issuer=settings.oauth2_issuer,
-        user_agent=USER_AGENT,
-        code_verifier=code_verifier,
-        code_challenge=code_challenge,
-    )
+#     Returns:
+#         AuthParams: The authentication parameters.
+#     """
+#     # TODO split this logic into one for getting auth code, and one for getting and refreshing tokens.
+#     settings = get_settings()
+#     if jwks_client is None:
+#         jwks_client = PyJWKClient(settings.jwks_uri)
+#     code_verifier, code_challenge = AH.generate_code_challenge()
+#     callback_url = CallbackUrl.parse(credentials.callback_url)
+#     return AuthParams(
+#         client_id=credentials.client_id,
+#         token_endpoint=settings.token_endpoint,
+#         authorization_endpoint=settings.authorization_endpoint,
+#         callback_url=callback_url,
+#         jwks_client=jwks_client,
+#         audience=settings.oauth2_audience,
+#         issuer=settings.oauth2_issuer,
+#         user_agent=USER_AGENT,
+#         code_verifier=code_verifier,
+#         code_challenge=code_challenge,
+#     )
 
 
-def get_sso_url(auth_params: AuthParams, scopes: Sequence[str]) -> tuple[str, str]:
-    """Generate the SSO URL for user authorization."""
-    sso_url, state = AH.redirect_to_sso(
-        client_id=auth_params.client_id,
-        redirect_uri=auth_params.callback_url.url(),
-        scopes=scopes,
-        authorization_endpoint=auth_params.authorization_endpoint,
-        challenge=auth_params.code_challenge,
-    )
-    logger.info(f"Generated SSO URL: {sso_url} with state: {state}")
-    return sso_url, state
+# def get_sso_url(
+#     credentials: EveCredentials,
+#     oauth_params: OauthParams,
+#     code_challenge: str,
+#     scopes: Sequence[str] | None = None,
+# ) -> tuple[str, str]:
+#     """Generate the SSO URL for user authorization."""
+#     if scopes is None:
+#         scopes = credentials.scopes
+#     else:
+#         for scope in scopes:
+#             if scope not in credentials.scopes:
+#                 raise ValueError(
+#                     f"Requested scope '{scope}' not in allowed scopes: {credentials.scopes}"
+#                 )
+#     sso_url, state = AH.redirect_to_sso(
+#         client_id=credentials.client_id,
+#         redirect_uri=credentials.callback_url,
+#         scopes=scopes,
+#         authorization_endpoint=oauth_params.authorization_endpoint,
+#         challenge=code_challenge,
+#     )
+#     logger.info(f"Generated SSO URL: {sso_url} with state: {state}")
+#     return sso_url, state
 
 
 async def request_authorization_code(
-    auth_params: AuthParams, expected_state: str
+    credentials: EveCredentials, auth_state: AuthState
 ) -> str:
-    """Run the callback server to receive the authorization code."""
+    """Run the callback server to receive the authorization code.
+
+    In addtion to returning the authorization code, this function also updates
+    the provided AuthState instance with the received code.
+
+    Args:
+        credentials: The EveCredentials instance containing client info.
+        auth_state: The AuthState instance containing state for the auth flow.
+
+    Returns:
+        str: The received authorization code.
+    """
     logger.info("Starting callback server to receive authorization code...")
+    callback_url = CallbackUrl.parse(credentials.callback_url)
     authorization_code = await AH.run_callback_server(
-        callback_host=auth_params.callback_url.callback_host,
-        callback_port=auth_params.callback_url.callback_port,
-        callback_route=auth_params.callback_url.callback_route,
-        expected_state=expected_state,
+        callback_host=callback_url.callback_host,
+        callback_port=callback_url.callback_port,
+        callback_route=callback_url.callback_route,
+        expected_state=auth_state.state,
     )
     logger.info(f"Received authorization code: {authorization_code}")
+    auth_state.authorization_code = authorization_code
     return authorization_code
 
 
 async def request_token(
-    auth_params: AuthParams,
-    authorization_code: str,
+    credentials: EveCredentials,
+    auth_state: AuthState,
+    oauth_params: OauthParams,
     client_session: aiohttp.ClientSession,
+    user_agent: str = USER_AGENT,
 ) -> AH.OauthToken:
-    """Request an access token using the authorization code."""
+    """Request an access token using the authorization code.
+
+    Args:
+        credentials: The EveCredentials instance containing client info.
+        auth_state: The AuthState instance containing state for the auth flow.
+        oauth_params: The OauthParams instance containing OAuth2 parameters.
+        client_session: The aiohttp client session to use for HTTP requests.
+        user_agent: The User-Agent string to use for HTTP requests.
+
+    Returns:
+        AH.OauthToken: The obtained OAuth token.
+
+    Raises:
+        ValueError: If the authorization code is not set in AuthState.
+    """
     logger.info("Requesting access token...")
+    if auth_state.authorization_code is None:
+        raise ValueError("Authorization code is not set in AuthState.")
     token = await AH.request_token(
-        client_id=auth_params.client_id,
-        authorization_code=authorization_code,
-        code_verifier=auth_params.code_verifier,
-        token_endpoint=auth_params.token_endpoint,
+        client_id=credentials.client_id,
+        authorization_code=auth_state.authorization_code,
+        code_verifier=auth_state.code_verifier,
+        token_endpoint=oauth_params.token_endpoint,
         client_session=client_session,
-        user_agent=auth_params.user_agent,
+        user_agent=user_agent,
     )
     logger.info(f"Received token: {token}")
     return token
 
 
-def validate_token(auth_params: AuthParams, access_token: str) -> dict[str, Any]:
-    """Validate the received JWT access token."""
+def validate_token(
+    oauth_params: OauthParams,
+    jwks_client: PyJWKClient | None,
+    access_token: str,
+    user_agent: str = USER_AGENT,
+) -> dict[str, Any]:
+    """Validate and decode the received JWT access token.
+
+    Args:
+        oauth_params: The OauthParams instance containing OAuth2 parameters.
+        jwks_client: Optional PyJWKClient instance for token validation. If None, a new one will be created.
+        access_token: The JWT access token to validate.
+        user_agent: The User-Agent string to use for HTTP requests.
+
+    Returns:
+        dict: The validated and decodedJWT token payload.
+    """
     logger.info("Validating access token...")
+    if jwks_client is None:
+        jwks_client = PyJWKClient(oauth_params.jwks_uri)
     validated_token = AH.validate_jwt_token(
         access_token=access_token,
-        jwks_client=auth_params.jwks_client,
-        audience=auth_params.audience,
-        issuers=auth_params.issuer,
-        user_agent=auth_params.user_agent,
+        jwks_client=jwks_client,
+        audience=oauth_params.audience,
+        issuers=oauth_params.issuer,
+        user_agent=user_agent,
     )
     logger.info(f"Validated token: {validated_token}")
     return validated_token
 
 
 async def authenticate_character(
-    auth_params: AuthParams,
-    sso_url: str,
-    state: str,
+    credentials: EveCredentials,
+    oauth_params: OauthParams,
+    auth_state: AuthState,
 ) -> CharacterToken:
     """Run the full authentication flow for a character.
 
@@ -261,24 +341,33 @@ async def authenticate_character(
     - Validating the received token
 
     Args:
-        auth_params: The authentication parameters.
-        sso_url: The SSO URL to direct the user to.
-        state: The expected state value for CSRF protection.
-        client_session: The aiohttp client session to use for HTTP requests.
+        credentials: The EveCredentials instance containing client info.
+        oauth_params: The OauthParams instance containing OAuth2 parameters.
+        auth_state: The AuthState instance containing state for the auth flow.
 
     Returns:
         CharacterToken: The authenticated character's token information.
+
+    Raises:
+        AuthenticationError: If any step in the authentication process fails.
     """
-    logger.info(f"Starting authentication flow. Navigate to: {sso_url}")
-    logger.info(
-        f"Listening on http://{auth_params.callback_url.callback_host}:{auth_params.callback_url.callback_port}{auth_params.callback_url.callback_route} for callback..."
-    )
+    logger.info(f"Starting authentication flow. Navigate to: {auth_state.sso_url}")
+    logger.info(f"Listening on {credentials.callback_url} for callback...")
     async with aiohttp.ClientSession() as client_session:
-        _authorization_code = await request_authorization_code(auth_params, state)
+        _authorization_code = await request_authorization_code(
+            credentials=credentials, auth_state=auth_state
+        )
         logger.info(f"Received authorization code: {_authorization_code}")
-        token = await request_token(auth_params, _authorization_code, client_session)
+        token = await request_token(
+            credentials=credentials,
+            auth_state=auth_state,
+            oauth_params=oauth_params,
+            client_session=client_session,
+        )
         logger.info(f"Received token: {token}")
-        validated_token = validate_token(auth_params, token["access_token"])
+        validated_token = validate_token(
+            oauth_params, jwks_client=None, access_token=token["access_token"]
+        )
         character_token = character_token_from_validated_token(validated_token, token)
         logger.info(f"Created CharacterToken: {character_token}")
     return character_token
@@ -287,7 +376,15 @@ async def authenticate_character(
 def character_token_from_validated_token(
     validated_token: dict[str, Any], token: AH.OauthToken
 ) -> CharacterToken:
-    """Create a CharacterToken from a validated JWT token and raw token data."""
+    """Create a CharacterToken from a validated JWT token and raw token data.
+
+    Args:
+        validated_token: The validated JWT token payload.
+        token: The raw token data from the token endpoint.
+
+    Returns:
+        CharacterToken: The constructed CharacterToken instance.
+    """
     return CharacterToken(
         character_id=validated_token.get("sub", "Unknown").split(":")[-1],
         character_name=validated_token.get("name", "Unknown"),
@@ -301,20 +398,42 @@ def character_token_from_validated_token(
 
 
 async def refresh_character(
-    auth_params: AuthParams,
+    credentials: EveCredentials,
+    oauth_params: OauthParams,
     character_token: CharacterToken,
     client_session: aiohttp.ClientSession,
+    jwks_client: PyJWKClient | None = None,
+    user_agent: str = USER_AGENT,
 ) -> CharacterToken:
-    """Refresh an access token using the provided refresh token."""
+    """Refresh an access token using the provided refresh token.
+
+    Args:
+        credentials: The EveCredentials instance containing client info.
+        oauth_params: The OauthParams instance containing OAuth2 parameters.
+        character_token: The CharacterToken instance to refresh.
+        client_session: The aiohttp client session to use for HTTP requests.
+        jwks_client: Optional PyJWKClient instance for token validation. If None, a new one will be created.
+        user_agent: The User-Agent string to use for HTTP requests.
+
+    Returns:
+        CharacterToken: The refreshed character token.
+
+    Raises:
+        TokenRefreshError: If the token refresh fails.
+    """
     try:
         refresh_token = await AH.do_refresh_token(
             refresh_token=character_token.refresh_token,
-            client_id=auth_params.client_id,
-            token_endpoint=auth_params.token_endpoint,
-            user_agent=auth_params.user_agent,
+            client_id=credentials.client_id,
+            token_endpoint=oauth_params.token_endpoint,
+            user_agent=user_agent,
             client_session=client_session,
         )
-        validated_token = validate_token(auth_params, refresh_token["access_token"])
+        validated_token = validate_token(
+            oauth_params=oauth_params,
+            jwks_client=jwks_client,
+            access_token=refresh_token["access_token"],
+        )
         new_character_token = character_token_from_validated_token(
             validated_token, refresh_token
         )
@@ -332,22 +451,34 @@ async def refresh_character(
 
 
 async def refresh_multiple_characters(
-    auth_params: AuthParams,
+    credentials: EveCredentials,
+    oauth_params: OauthParams,
     character_tokens: Sequence[CharacterToken],
 ) -> list[CharacterToken | Exception]:
     """Refresh multiple character tokens concurrently.
 
     Args:
-        auth_params: The authentication parameters.
+        credentials: The EveCredentials instance containing client info.
+        oauth_params: The OauthParams instance containing OAuth2 parameters.
         character_tokens: A sequence of CharacterToken instances to refresh.
 
     Returns:
         A dictionary mapping character IDs to their refreshed CharacterToken instances.
+
+    Raises:
+        TokenRefreshError: If any token refresh fails.
     """
     refreshed_tokens: list[CharacterToken | Exception] = []
+    jwks_client = PyJWKClient(oauth_params.jwks_uri)
     async with aiohttp.ClientSession() as client_session:
         tasks = [
-            refresh_character(auth_params, token, client_session)
+            refresh_character(
+                credentials=credentials,
+                oauth_params=oauth_params,
+                character_token=token,
+                client_session=client_session,
+                jwks_client=jwks_client,
+            )
             for token in character_tokens
         ]
         results = await asyncio.gather(*tasks, return_exceptions=True)

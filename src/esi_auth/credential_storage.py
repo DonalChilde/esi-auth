@@ -1,4 +1,10 @@
-"""Credential storage implementations and protocols."""
+"""Credential storage implementations and protocols.
+
+Credentials for Eve ESI apps are downloaded by the user as json files, and are
+stored locally. This module defines a protocol for credential storage and
+provides a JSON file-based implementation.
+
+"""
 
 import logging
 from pathlib import Path

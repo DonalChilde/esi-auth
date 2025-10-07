@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 
 def get_authorized_characters(
-    client_id: str | None = None,
+    client_id: int | None = None,
     client_alias: str | None = None,
     buffer_minutes: int = 5,
 ) -> dict[int, CharacterToken]:

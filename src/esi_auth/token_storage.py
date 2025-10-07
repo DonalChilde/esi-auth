@@ -404,11 +404,16 @@ class TokenStoreJson(TokenStorageProtocol):
 
         Args:
             credentials: The EveCredentials associated with the characters.
-            buffer_minutes: The buffer time in minutes before actual expiration to consider for refresh.
+            buffer_minutes: Minutes before actual expiration to consider a token as needing refresh.
+                Should not exceed 15 minutes, as the starting lifetime for a refreshed token is 20 minutes.
 
         Returns:
             A list of CharacterToken instances that need their access tokens refreshed.
         """
+        if buffer_minutes < 0:
+            raise ValueError("buffer_minutes must be non-negative")
+        if buffer_minutes > 15:
+            raise ValueError("buffer_minutes should not exceed 15 minutes")
         logger.debug(
             f"Listing characters needing refresh with buffer {buffer_minutes}m"
         )

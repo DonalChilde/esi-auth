@@ -143,9 +143,7 @@ async def request_token(
         aiohttp.ClientResponseError: If the token request fails.
     """
     if not client_session:
-        raise ValueError("client_session must be initialized")
-    # if client_session is None:
-    #     client_session = aiohttp.ClientSession()
+        raise ValueError("client_session must be initialized to request token.")
     headers = {
         "Content-Type": "application/x-www-form-urlencoded",
         "User-Agent": user_agent,
@@ -163,7 +161,7 @@ async def request_token(
     return result
 
 
-async def do_refresh_token(
+async def request_refreshed_token(
     refresh_token: str,
     client_id: str,
     token_endpoint: str,
@@ -187,7 +185,7 @@ async def do_refresh_token(
         aiohttp.ClientResponseError: If the token request fails.
     """
     if not client_session:
-        raise ValueError("client_session must be initialized")
+        raise ValueError("client_session must be initialized to refresh token.")
     headers = {
         "Content-Type": "application/x-www-form-urlencoded",
         "User-Agent": user_agent,
@@ -446,6 +444,7 @@ async def run_callback_server(
     callback_host: str = "localhost",
     callback_port: int = 8080,
     callback_route: str = "/callback",
+    timeout: int = 300,
 ) -> str:
     """Run temporary HTTP server to receive OAuth callback.
 
@@ -454,6 +453,7 @@ async def run_callback_server(
         callback_host: The hostname for the callback server (default: localhost).
         callback_port: The port for the callback server (default: 8080).
         callback_route: The route for the callback (default: /callback).
+        timeout: Time in seconds to wait for the callback before timing out (default: 300).
 
     Returns:
         The authorization code from the callback.
@@ -524,7 +524,6 @@ async def run_callback_server(
         )
 
         # Wait for callback or timeout
-        timeout = 300  # 5 minutes
         for _ in range(timeout):
             if authorization_code or error_message:
                 break
@@ -543,7 +542,7 @@ async def run_callback_server(
         logger.debug("Callback server stopped")
 
 
-async def get_token(
+async def get_token_flow(
     client_id: str,
     sso_url: str,
     state: str,

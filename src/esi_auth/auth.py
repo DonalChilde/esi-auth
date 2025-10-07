@@ -31,27 +31,6 @@ USER_AGENT = get_user_agent()
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
 
-# TODO move exception generation to auth_helpers, and ensure consistent usage.
-
-
-class AuthenticationError(Exception):
-    """Exception raised during authentication process.
-
-    This exception is raised when authentication fails or encounters
-    an error during the OAuth flow or token operations.
-    """
-
-    def __init__(self, message: str, error_code: str | None = None):
-        """Initialize the authentication error.
-
-        Args:
-            message: Human-readable error message.
-            error_code: Optional error code for programmatic handling.
-        """
-        super().__init__(message)
-        self.message = message
-        self.error_code = error_code
-
 
 class TokenRefreshError(Exception):
     """Exception raised when token refresh fails.
@@ -72,20 +51,6 @@ class TokenRefreshError(Exception):
         self.message = message
         self.character_id = character_id
         self.error_code = error_code
-
-
-# @dataclass
-# class AuthParams:
-#     client_id: str
-#     token_endpoint: str
-#     authorization_endpoint: str
-#     callback_url: CallbackUrl
-#     jwks_client: PyJWKClient
-#     audience: str
-#     issuer: Sequence[str]
-#     user_agent: str
-#     code_verifier: str
-#     code_challenge: str
 
 
 @dataclass(slots=True)
@@ -164,71 +129,6 @@ def get_auth_state(
         state=state,
         sso_url=sso_url,
     )
-
-
-# new thoughts on param passing:
-# - Credentials
-# - oauth_params - endpoints, audience, issuer, jwks_uri
-# - code_verifier, code_challenge, state, sso_url - These only needed for initial auth
-
-
-# def create_auth_params(
-#     credentials: EveCredentials,
-#     jwks_client: PyJWKClient | None = None,
-# ) -> AuthParams:
-#     """Create authentication parameters from current settings.
-
-#     Args:
-#         credentials: The EveCredentials instance containing client info.
-#         jwks_client: Optional PyJWKClient instance. If None, a new one will be created.
-
-#     Returns:
-#         AuthParams: The authentication parameters.
-#     """
-#     # TODO split this logic into one for getting auth code, and one for getting and refreshing tokens.
-#     settings = get_settings()
-#     if jwks_client is None:
-#         jwks_client = PyJWKClient(settings.jwks_uri)
-#     code_verifier, code_challenge = AH.generate_code_challenge()
-#     callback_url = CallbackUrl.parse(credentials.callback_url)
-#     return AuthParams(
-#         client_id=credentials.client_id,
-#         token_endpoint=settings.token_endpoint,
-#         authorization_endpoint=settings.authorization_endpoint,
-#         callback_url=callback_url,
-#         jwks_client=jwks_client,
-#         audience=settings.oauth2_audience,
-#         issuer=settings.oauth2_issuer,
-#         user_agent=USER_AGENT,
-#         code_verifier=code_verifier,
-#         code_challenge=code_challenge,
-#     )
-
-
-# def get_sso_url(
-#     credentials: EveCredentials,
-#     oauth_params: OauthParams,
-#     code_challenge: str,
-#     scopes: Sequence[str] | None = None,
-# ) -> tuple[str, str]:
-#     """Generate the SSO URL for user authorization."""
-#     if scopes is None:
-#         scopes = credentials.scopes
-#     else:
-#         for scope in scopes:
-#             if scope not in credentials.scopes:
-#                 raise ValueError(
-#                     f"Requested scope '{scope}' not in allowed scopes: {credentials.scopes}"
-#                 )
-#     sso_url, state = AH.redirect_to_sso(
-#         client_id=credentials.client_id,
-#         redirect_uri=credentials.callback_url,
-#         scopes=scopes,
-#         authorization_endpoint=oauth_params.authorization_endpoint,
-#         challenge=code_challenge,
-#     )
-#     logger.info(f"Generated SSO URL: {sso_url} with state: {state}")
-#     return sso_url, state
 
 
 async def request_authorization_code(
@@ -422,7 +322,7 @@ async def refresh_character(
         TokenRefreshError: If the token refresh fails.
     """
     try:
-        refresh_token = await AH.do_refresh_token(
+        refresh_token = await AH.request_refreshed_token(
             refresh_token=character_token.refresh_token,
             client_id=credentials.client_id,
             token_endpoint=oauth_params.token_endpoint,

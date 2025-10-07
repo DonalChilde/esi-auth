@@ -53,33 +53,11 @@ project-name: "esi-auth"
 
 esi-auth manages obtaining, storing, and refreshing authentication tokens for the Eve Online ESI api.
 
-- Application settings are managed by pydantic-settings.
-- The application directory can be set through environment variables, and defaults to the directory provided by `typer.get_app_dir("pfmsoft-esi-auth")`
-- client id and secret used for authentication is located in an env file loaded by pydantic settings.
-- A testing-only client id and secret will be loaded from a testing only application settings profile.
-- the user must provide their own client id and secret obtained from the EVE Online Developers Portal
-- Tokens and related metadata are stored in a json file located in the application directory. This file is loaded and saved through a pydantic.BaseModel
-- The cli uses typer. The cli entry point is located at `esi_auth.cli.main_typer.py` and each group of commands is in a separate `.py` file located in the `esi_auth.cli` package.
-- the cli has commands that can:
-  - list authenticated characters, with token expiration data.
-  - authenticate a character_id to a list of scopes provided as a json-serialized string, or loaded from a json file.
-  - refresh a character_id token
-  - do a simple proof of authentication by retrieving character data and printing it to terminal.
-  - remove a character_id from the collection of authenticated characters.
-- esi-auth exposes the following api:
-  - load_characters -> loads the authenticated characters from file, and returns the pydantic.BaseModel containing the data.
-  - refresh_token -> refreshes the token for one character_id
-  - authenticate character -> authenticate one character_id for a list of scopes.
-  - remove_character -> remove a character_id from collection of authenticated characters.
-- html templates use Jinja2
-- data models are collected in a `models.py` file
-
 ## Project Dependencies
 
 - aiohttp is used to make network requests
-- Jinja2 is used to manage html templates
 - pydantic is used to serialize and validate application data
-- pydantic-settings is ued to manage application settings.
+- pydantic-settings is used to manage application settings.
 - typer is used to provide the cli interface
 - whenever is used to interact with datetimes
 

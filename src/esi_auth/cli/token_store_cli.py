@@ -24,6 +24,7 @@ from .cli_helpers import check_user_agent_setup
 logger = logging.getLogger(__name__)
 
 app = typer.Typer(no_args_is_help=True)
+# TODO change client_id to integer where possible
 
 
 @app.command()

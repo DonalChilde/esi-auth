@@ -52,6 +52,7 @@ project-name: "esi-auth"
 ## Project Overview
 
 esi-auth manages obtaining, storing, and refreshing authentication tokens for the Eve Online ESI api.
+esi-auth supports storing tokens for multiple Eve ESI apps.
 
 ## Project Dependencies
 

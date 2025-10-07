@@ -1,3 +1,5 @@
+"""Command line interface for esi-auth."""
+
 from dataclasses import dataclass
 from importlib import metadata
 from time import perf_counter_ns
@@ -9,7 +11,7 @@ from rich.console import Console
 from esi_auth.settings import get_settings
 from esi_auth.token_storage import TokenStoreJson
 
-from .credentials import app as credentials_app
+from .credential_store_cli import app as credentials_app
 from .token_store_cli import app as token_store_app
 from .util_cli import app as util_app
 
@@ -33,6 +35,7 @@ class CliConfig:
     silent: bool = False
 
     def __repr__(self) -> str:
+        """Return a string representation of the CLI configuration."""
         return (
             f"CliConfig("
             f"app_name={self.app_name!r}, "
@@ -45,6 +48,7 @@ class CliConfig:
         )
 
     def __str__(self) -> str:
+        """Return a user-friendly string representation of the CLI configuration."""
         return (
             f"CliConfig:\n"
             f" \tapp_name={self.app_name}\n"
@@ -70,6 +74,7 @@ def default_options(
 
     Insert pithy saying here
     """
+    check_setup(ctx)
     init_config(ctx, debug=debug, verbosity=verbosity, silent=silent)
     console = Console()
     console.print("[bold]Welcome to esi-auth, a tool for managing EVE SSO tokens.")
@@ -89,7 +94,7 @@ def init_config(
     start = perf_counter_ns()
     settings = get_settings()
     token_path = settings.token_store_dir / settings.token_file_name
-
+    # TODO move to check setup?
     if not token_path.is_file():
         TokenStoreJson.init_store(token_path)
 
@@ -102,6 +107,23 @@ def init_config(
         silent=silent,
     )
     ctx.obj = config
+
+
+def check_setup(ctx: typer.Context) -> None:
+    """Check that the application is properly set up."""
+    # TODO check user agent fields set.
+    # TODO check if credential store exists.
+    # TODO check if token store exists.
+    # TODO check if app dirs exist.
+    # TODO check if .env exists
+
+    # settings = get_settings()
+    # settings.ensure_app_dir()
+    # token_path = settings.token_store_dir / settings.token_file_name
+    # if not token_path.is_file():
+    #     TokenStoreJson.init_store(token_path)
+    # ctx.obj.app_dir = settings.app_dir
+    # ctx.obj.token_store_path = token_path
 
 
 @app.command()

@@ -1,16 +1,27 @@
 """Application settings for esi-auth."""
 
+import json
 from collections.abc import Sequence
 from pathlib import Path
 from typing import Any, ClassVar
 
 import typer
-from pydantic import Field
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 NAMESPACE = "pfmsoft"
 APPLICATION_NAME = "esi-auth"
 DEFAULT_APP_DIR = Path(typer.get_app_dir(f"{NAMESPACE}-{APPLICATION_NAME}"))
+ESI_BASE_URL = "https://esi.evetech.net"
+SSO_BASE_URL = "https://login.eveonline.com"
+OAUTH_METADATA_URL = (
+    "https://login.eveonline.com/.well-known/oauth-authorization-server"
+)
+TOKEN_ENDPOINT = "https://login.eveonline.com/v2/oauth/token"
+AUTHORIZATION_ENDPOINT = "https://login.eveonline.com/v2/oauth/authorize"
+JWKS_URI = "https://login.eveonline.com/oauth/jwks"
+OAUTH_ISSUER = ["https://login.eveonline.com"]
+OAUTH_AUDIENCE = "EVE Online"
 
 
 class EsiAuthSettings(BaseSettings):
@@ -34,6 +45,7 @@ class EsiAuthSettings(BaseSettings):
     ############################################################################
     # Application configuration
     ############################################################################
+    # TODO possibly unneeded
     app_name: str = Field(
         default=APPLICATION_NAME,
         description="Application name.",
@@ -101,30 +113,30 @@ class EsiAuthSettings(BaseSettings):
 
     # Authorization metadata endpoint - https://login.eveonline.com/.well-known/oauth-authorization-server
     oauth2_authorization_metadata_url: str = Field(
-        default="https://login.eveonline.com/.well-known/oauth-authorization-server",
+        default=OAUTH_METADATA_URL,
         description="URL for OAuth2 authorization server metadata",
     )
     authorization_endpoint: str = Field(
-        default="https://login.eveonline.com/v2/oauth/authorize",
+        default=AUTHORIZATION_ENDPOINT,
         description="URL for OAuth2 authorization endpoint",
     )
     token_endpoint: str = Field(
-        default="https://login.eveonline.com/v2/oauth/token",
+        default=TOKEN_ENDPOINT,
         description="URL for OAuth2 token endpoint",
     )
     jwks_uri: str = Field(
-        default="https://login.eveonline.com/oauth/jwks",
+        default=JWKS_URI,
         description="URL for OAuth2 JSON Web Key Set (JWKS) endpoint",
     )
 
     # Audience for token validation
     oauth2_audience: str = Field(
-        default="EVE Online", description="Audience for validating JWT tokens"
+        default=OAUTH_AUDIENCE, description="Audience for validating JWT tokens"
     )
 
     # Issuer for token validation
     oauth2_issuer: Sequence[str] = Field(
-        default=["https://login.eveonline.com"],
+        default=OAUTH_ISSUER,
         description="Issuer for validating JWT tokens",
     )
 
@@ -167,18 +179,18 @@ class EsiAuthSettings(BaseSettings):
         self.token_store_dir.mkdir(parents=True, exist_ok=True)
         self.credential_store_dir.mkdir(parents=True, exist_ok=True)
 
-    # @field_validator("scopes", mode="before")
-    # @classmethod
-    # def json_decode(cls, v: Any) -> list[str]:
-    #     """Decode JSON string to list if necessary."""
-    #     if isinstance(v, str):
-    #         try:
-    #             return json.loads(v)
-    #         except ValueError:
-    #             pass
-    #     if isinstance(v, list):
-    #         return v  # pyright: ignore[reportUnknownVariableType]
-    #     raise ValueError("Invalid format for scopes")
+    @field_validator("oauth2_issuer", mode="before")
+    @classmethod
+    def json_decode(cls, v: Any) -> list[str]:
+        """Decode JSON string to list if necessary."""
+        if isinstance(v, str):
+            try:
+                return json.loads(v)
+            except ValueError:
+                pass
+        if isinstance(v, list):
+            return v  # pyright: ignore[reportUnknownVariableType]
+        raise ValueError("Invalid format for scopes")
 
 
 class SettingsManager:

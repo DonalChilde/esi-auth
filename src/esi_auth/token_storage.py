@@ -162,7 +162,9 @@ class TokenStoreJson(TokenStorageProtocol):
             TokenStorageError: If file exists but cannot be loaded or parsed.
         """
         if not self.storage_path.is_file():
-            logger.info(f"Token file does not exist: {self.storage_path}")
+            logger.info(
+                f"Token file does not exist: {self.storage_path}, creating empty store."
+            )
             return AuthenticatedCharacters()
 
         try:

@@ -155,7 +155,9 @@ class CredentialStoreJson(CredentialStorageProtocol):
             CredentialStorageError: If loading fails.
         """
         if not self.storage_path.is_file():
-            logger.info(f"Credential file does not exist: {self.storage_path}")
+            logger.info(
+                f"Credential file does not exist: {self.storage_path}, creating empty store."
+            )
             return CredentialStore()
         try:
             logger.info(f"Loading credentials from {self.storage_path}")
@@ -196,6 +198,23 @@ class CredentialStoreJson(CredentialStorageProtocol):
             error_msg = f"Failed to save credentials file: {e}"
             logger.error(error_msg)
             raise CredentialStorageError(error_msg, self.storage_path) from e
+
+    @classmethod
+    def init_store(cls, storage_path: Path) -> None:
+        """Initialize the credential store.
+
+        Args:
+            storage_path: The path to the JSON file for storing credentials.
+        """
+        if storage_path.is_file():
+            logger.warning(f"Credential store already exists at {storage_path}")
+            raise CredentialStorageError(
+                f"Credential store already exists at {storage_path}", storage_path
+            )
+            return
+        new_store = cls(storage_path)
+        new_store._save_credentials(CredentialStore())
+        logger.info(f"Initialized new credential store at {storage_path}")
 
     def add_credentials(self, credentials: EveCredentials) -> None:
         """Save the given credentials to storage.

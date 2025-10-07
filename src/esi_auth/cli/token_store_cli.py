@@ -19,6 +19,8 @@ from esi_auth.models import EveCredentials
 from esi_auth.settings import get_settings
 from esi_auth.token_storage import get_token_store
 
+from .cli_helpers import check_user_agent_setup
+
 logger = logging.getLogger(__name__)
 
 app = typer.Typer(no_args_is_help=True)
@@ -47,6 +49,7 @@ def add(
     """Add an authorized character to the token store."""
     console = Console()
     console.rule("[bold blue]Add Authorized Character[/bold blue]")
+    check_user_agent_setup(ctx)
     settings = get_settings()
     credential_store = get_credential_store()
     # Checks for client_id/client_alias presence and mutual exclusivity
@@ -164,7 +167,7 @@ def list(
 ):
     """List authorized characters."""
     console = Console()
-    console.rule("[bold blue]Authorized Characters[/bold blue]")
+    console.rule("[bold blue]List Authorized Characters[/bold blue]")
 
     credential_store = get_credential_store()
     # Checks for client_id/client_alias presence and mutual exclusivity
@@ -309,6 +312,7 @@ def refresh(
     """
     console = Console()
     console.rule("[bold blue]Refresh Character Tokens[/bold blue]")
+    check_user_agent_setup(ctx)
     if buffer_minutes < 0:
         console.print("Error: buffer_minutes must be non-negative.", style="bold red")
         raise typer.Exit(code=1)

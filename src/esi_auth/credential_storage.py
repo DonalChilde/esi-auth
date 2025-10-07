@@ -76,11 +76,30 @@ class CredentialStorageProtocol(Protocol):
         """
         ...
 
-    def get_credentials_by_alias(self, alias: str) -> EveCredentials | None:
+    def get_credentials_by_alias(self, client_alias: str) -> EveCredentials | None:
         """Retrieve credentials by alias.
 
         Args:
-            alias: The alias of the application to retrieve.
+            client_alias: The alias of the application to retrieve.
+
+        Returns:
+            The EveCredentials instance if found, else None.
+
+        Raises:
+            CredentialStorageError: If retrieval fails.
+        """
+        ...
+
+    def get_credentials_by_alias_or_id(
+        self, client_id: str | None = None, client_alias: str | None = None
+    ) -> EveCredentials | None:
+        """Retrieve credentials by client_id or alias.
+
+        Args:
+            client_id: The client ID for which to retrieve authorized characters.
+                If provided, client_alias must be None.
+            client_alias: The client alias for which to retrieve authorized characters.
+                If provided, client_id must be None.
 
         Returns:
             The EveCredentials instance if found, else None.
@@ -223,11 +242,11 @@ class CredentialStoreJson(CredentialStorageProtocol):
         existing_store = self._load_credentials()
         return existing_store.credentials.get(client_id)
 
-    def get_credentials_by_alias(self, alias: str) -> EveCredentials | None:
+    def get_credentials_by_alias(self, client_alias: str) -> EveCredentials | None:
         """Retrieve credentials by alias.
 
         Args:
-            alias: The alias of the application to retrieve.
+            client_alias: The alias of the application to retrieve.
 
         Returns:
             The EveCredentials instance if found, else None.
@@ -235,12 +254,35 @@ class CredentialStoreJson(CredentialStorageProtocol):
         Raises:
             CredentialStorageError: If retrieval fails.
         """
-        logger.debug(f"Retrieving credentials for alias: {alias}")
+        logger.debug(f"Retrieving credentials for alias: {client_alias}")
         existing_store = self._load_credentials()
         for cred in existing_store.credentials.values():
-            if cred.alias == alias:
+            if cred.alias == client_alias:
                 return cred
         return None
+
+    def get_credentials_by_alias_or_id(
+        self, client_id: str | None = None, client_alias: str | None = None
+    ) -> EveCredentials | None:
+        """Retrieve credentials by client_id or alias.
+
+        Args:
+            client_id: The client ID for which to retrieve authorized characters.
+                If provided, client_alias must be None.
+            client_alias: The client alias for which to retrieve authorized characters.
+                If provided, client_id must be None.
+
+        Returns:
+            The EveCredentials instance if found, else None.
+        """
+        if client_id and client_alias:
+            raise ValueError("Specify either client_id or client_alias, not both.")
+        if not any([client_id, client_alias]):
+            raise ValueError("Either client_id or client_alias must be specified.")
+        if client_id:
+            return self.get_credentials(client_id)
+        if client_alias:
+            return self.get_credentials_by_alias(client_alias)
 
     def list_credentials(self) -> list[EveCredentials]:
         """List all stored credentials.

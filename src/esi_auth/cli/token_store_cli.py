@@ -222,6 +222,7 @@ def get_credentials_from_store(
     client_alias: str | None,
 ) -> EveCredentials:
     """Helper to get credential and token stores and validate client info."""
+    # Note: duplicate argument verification code retained for better CLI error messages.
     console = Console()
     if all([client_id, client_alias]):
         console.print(
@@ -237,8 +238,10 @@ def get_credentials_from_store(
         raise typer.Exit(code=1)
     if client_alias:
         credentials = credential_store.get_credentials_by_alias(client_alias)
-    else:
-        credentials = credential_store.get_credentials(client_id)  # pyright: ignore[reportArgumentType]
+    elif client_id:
+        credentials = credential_store.get_credentials(client_id)
+    else:  # Should not be reachable
+        credentials = None
     if not credentials:
         console.print(
             f"Credentials not found for "

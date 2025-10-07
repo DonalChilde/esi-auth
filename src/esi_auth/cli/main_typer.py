@@ -21,7 +21,7 @@ app = typer.Typer(no_args_is_help=True)
 app.add_typer(
     credentials_app, name="credentials", help="Manage application credentials."
 )
-app.add_typer(token_store_app, name="store", help="Manage token storage.")
+app.add_typer(token_store_app, name="tokens", help="Manage token storage.")
 app.add_typer(util_app, name="util", help="Utility commands.")
 
 

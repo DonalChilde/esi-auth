@@ -84,24 +84,6 @@ class EsiAuthSettings(BaseSettings):
         default=30, description="HTTP request timeout in seconds"
     )
 
-    ############################################################################
-    # Oauth2
-    ############################################################################
-
-    # OAuth2 credentials
-    # client_id: str = Field(
-    #     default="NOT_SET",
-    #     description="EVE Online application client ID from developers.eveonline.com",
-    # )
-    # client_secret: str = Field(
-    #     default="NOT_SET",
-    #     description="EVE Online application client secret from developers.eveonline.com",
-    # )
-    # scopes: list[str] = Field(
-    #     default=["publicData"],
-    #     description="Default OAuth2 scopes for authentication",
-    # )
-
     # ESI API configuration
     esi_base_url: str = Field(
         default="https://esi.evetech.net", description="Base URL for EVE Online ESI API"
@@ -139,19 +121,6 @@ class EsiAuthSettings(BaseSettings):
         default=OAUTH_ISSUER,
         description="Issuer for validating JWT tokens",
     )
-
-    # Callback url settings
-    # callback_host: str = Field(
-    #     default="localhost", description="Host for OAuth callback server"
-    # )
-
-    # callback_port: int = Field(
-    #     default=8080, description="Port for OAuth callback server"
-    # )
-
-    # callback_route: str = Field(
-    #     default="/callback", description="Route for OAuth callback server"
-    # )
 
     ############################################################################
     # User agent configuration

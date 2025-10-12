@@ -9,14 +9,12 @@ from typing import Annotated
 import typer
 from rich.console import Console
 
-from esi_auth.credential_storage import CredentialStoreJson
+from esi_auth.esi_auth import AuthStoreException, EsiAuth
 from esi_auth.settings import get_settings
-from esi_auth.token_storage import TokenStoreJson
 
 from .credential_store_cli import app as credentials_app
 from .token_store_cli import app as token_store_app
 from .util_cli import app as util_app
-from .util_cli import example_env
 
 app = typer.Typer(no_args_is_help=True)
 
@@ -36,6 +34,7 @@ class CliConfig:
     debug: bool = False
     verbosity: int = 1
     silent: bool = False
+    auth_store: EsiAuth | None = None
 
     def __repr__(self) -> str:
         """Return a string representation of the CLI configuration."""
@@ -47,6 +46,7 @@ class CliConfig:
             f"debug={self.debug!r}, "
             f"verbosity={self.verbosity!r}, "
             f"silent={self.silent!r}, "
+            f"auth_store={self.auth_store.store_path if self.auth_store else None}"
             ")"
         )
 
@@ -60,6 +60,7 @@ class CliConfig:
             f" \tdebug={self.debug}\n"
             f" \tverbosity={self.verbosity}\n"
             f" \tsilent={self.silent}"
+            f" \tauth_store={self.auth_store.store_path if self.auth_store else None}\n"
         )
 
 
@@ -87,7 +88,6 @@ def default_options(
         # typer.echo(f"{indent_lines(str(ctx.obj), indent=2)}")
         typer.echo("App configuration:")
         # typer.echo(f"{indent_lines(str(CONFIG), indent=2)}")
-    ensure_setup()
 
 
 def init_config(
@@ -96,6 +96,18 @@ def init_config(
     """Initialize configuration based on CLI options."""
     start = perf_counter_ns()
     settings = get_settings()
+    settings.ensure_app_dir()
+    store_path = settings.auth_store_dir / settings.auth_store_file_name
+
+    try:
+        # Try to load the auth store. Creates a new store if missing.
+        auth_store = EsiAuth(
+            store_path=store_path, auth_server_timeout=settings.server_timeout
+        )
+    except AuthStoreException as e:
+        console = Console()
+        console.print(f"[bold red]Error initializing auth store: {e}")
+        raise typer.Exit(code=1) from e
 
     config = CliConfig(
         app_name=settings.app_name,
@@ -104,24 +116,25 @@ def init_config(
         debug=debug,
         verbosity=verbosity,
         silent=silent,
+        auth_store=auth_store,
     )
     ctx.obj = config
 
 
-def ensure_setup():
-    """Ensure that the application is properly set up."""
-    settings = get_settings()
-    settings.ensure_app_dir()
-    token_path = settings.token_store_dir / settings.token_file_name
-    if not token_path.is_file():
-        TokenStoreJson.init_store(token_path)
-    credentials_path = settings.credential_store_dir / settings.credential_file_name
-    if not credentials_path.is_file():
-        CredentialStoreJson.init_store(credentials_path)
-    env_path = settings.app_dir / ".env"
-    if not env_path.is_file():
-        env_path.parent.mkdir(parents=True, exist_ok=True)
-        env_path.write_text(example_env())
+# def ensure_setup():
+#     """Ensure that the application is properly set up."""
+#     settings = get_settings()
+#     settings.ensure_app_dir()
+#     # token_path = settings.token_store_dir / settings.token_file_name
+#     # if not token_path.is_file():
+#     #     TokenStoreJson.init_store(token_path)
+#     # credentials_path = settings.credential_store_dir / settings.credential_file_name
+#     # if not credentials_path.is_file():
+#     #     CredentialStoreJson.init_store(credentials_path)
+#     # env_path = settings.app_dir / ".env"
+#     # if not env_path.is_file():
+#     #     env_path.parent.mkdir(parents=True, exist_ok=True)
+#     #     env_path.write_text(example_env())
 
 
 @app.command()

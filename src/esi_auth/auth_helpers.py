@@ -44,18 +44,21 @@ class JWKS(TypedDict):
     keys: list[JWK]
 
 
-class VerifiedToken(TypedDict):
-    """Represents a verified character token."""
+type ValidatedToken = dict[str, Any]
 
-    # TODO confirm these fields
-    character_id: int
-    character_name: str
-    expires_on: str
-    scopes: list[str]
-    token_type: str
-    character_owner_hash: str
-    client_id: str
-    verified_at: str
+
+# class ValidatedToken(TypedDict):
+#     """Represents a validated character token."""
+
+#     pass
+#     # TODO check the actual fields
+#     # character_id: int
+#     # character_name: str
+#     # expires_on: str
+#     # scopes: list[str]
+#     # token_type: str
+#     # character_owner_hash: str
+#     # verified_at: str
 
 
 class OauthMetadata(TypedDict):
@@ -303,7 +306,7 @@ def validate_jwt_token(
     issuers: Sequence[str],
     user_agent: str,
     jwks_uri: str = "",
-) -> dict[str, Any]:
+) -> ValidatedToken:
     """Validates and decodes a JWT Token.
 
     Args:
@@ -345,14 +348,14 @@ def validate_jwt_token(
             issuer=issuers,
             options={"verify_aud": True, "verify_iss": True},
         )
+
+        return valid_decoded_token
     except jwt.ExpiredSignatureError as e:
         logger.error("Token has expired")
         raise e
     except Exception as e:
         logger.error(f"Invalid token or other error: {e}")
         raise e
-    # If we get here, the token is valid
-    return valid_decoded_token
 
 
 async def revoke_refresh_token(

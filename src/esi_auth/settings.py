@@ -1,12 +1,10 @@
 """Application settings for esi-auth."""
 
-import json
-from collections.abc import Sequence
 from pathlib import Path
 from typing import Any, ClassVar
 
 import typer
-from pydantic import Field, field_validator
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 NAMESPACE = "pfmsoft"
@@ -61,66 +59,77 @@ class EsiAuthSettings(BaseSettings):
         description="Directory for storing log files",
     )
 
-    token_store_dir: Path = Field(
-        default=DEFAULT_APP_DIR / "token-store",
-        description="Directory for storing token files",
+    auth_store_dir: Path = Field(
+        default=DEFAULT_APP_DIR, description="The directory containing the Auth Store."
+    )
+    auth_store_file_name: str = Field(
+        default="auth-store.json", description="File Name for the Auth Store."
     )
 
-    token_file_name: str = Field(
-        default="character_tokens.json",
-        description="Filename for storing character tokens",
-    )
-    credential_store_dir: Path = Field(
-        default=DEFAULT_APP_DIR / "credential-store",
-        description="Directory for storing credential files",
-    )
-    credential_file_name: str = Field(
-        default="app_credentials.json",
-        description="Filename for storing application credentials",
-    )
+    # token_store_dir: Path = Field(
+    #     default=DEFAULT_APP_DIR / "token-store",
+    #     description="Directory for storing token files",
+    # )
+
+    # token_file_name: str = Field(
+    #     default="character_tokens.json",
+    #     description="Filename for storing character tokens",
+    # )
+    # credential_store_dir: Path = Field(
+    #     default=DEFAULT_APP_DIR / "credential-store",
+    #     description="Directory for storing credential files",
+    # )
+    # credential_file_name: str = Field(
+    #     default="app_credentials.json",
+    #     description="Filename for storing application credentials",
+    # )
 
     # HTTP client configuration
     request_timeout: int = Field(
         default=30, description="HTTP request timeout in seconds"
     )
 
-    # ESI API configuration
-    esi_base_url: str = Field(
-        default="https://esi.evetech.net", description="Base URL for EVE Online ESI API"
+    server_timeout: int = Field(
+        default=300, description="The timeout for the authorization server."
     )
 
-    sso_base_url: str = Field(
-        default="https://login.eveonline.com", description="Base URL for EVE Online SSO"
-    )
+    # # ESI API configuration
+    # esi_base_url: str = Field(
+    #     default="https://esi.evetech.net", description="Base URL for EVE Online ESI API"
+    # )
+
+    # sso_base_url: str = Field(
+    #     default="https://login.eveonline.com", description="Base URL for EVE Online SSO"
+    # )
 
     # Authorization metadata endpoint - https://login.eveonline.com/.well-known/oauth-authorization-server
     oauth2_authorization_metadata_url: str = Field(
         default=OAUTH_METADATA_URL,
         description="URL for OAuth2 authorization server metadata",
     )
-    authorization_endpoint: str = Field(
-        default=AUTHORIZATION_ENDPOINT,
-        description="URL for OAuth2 authorization endpoint",
-    )
-    token_endpoint: str = Field(
-        default=TOKEN_ENDPOINT,
-        description="URL for OAuth2 token endpoint",
-    )
-    jwks_uri: str = Field(
-        default=JWKS_URI,
-        description="URL for OAuth2 JSON Web Key Set (JWKS) endpoint",
-    )
+    # authorization_endpoint: str = Field(
+    #     default=AUTHORIZATION_ENDPOINT,
+    #     description="URL for OAuth2 authorization endpoint",
+    # )
+    # token_endpoint: str = Field(
+    #     default=TOKEN_ENDPOINT,
+    #     description="URL for OAuth2 token endpoint",
+    # )
+    # jwks_uri: str = Field(
+    #     default=JWKS_URI,
+    #     description="URL for OAuth2 JSON Web Key Set (JWKS) endpoint",
+    # )
 
-    # Audience for token validation
-    oauth2_audience: str = Field(
-        default=OAUTH_AUDIENCE, description="Audience for validating JWT tokens"
-    )
+    # # Audience for token validation
+    # oauth2_audience: str = Field(
+    #     default=OAUTH_AUDIENCE, description="Audience for validating JWT tokens"
+    # )
 
-    # Issuer for token validation
-    oauth2_issuer: Sequence[str] = Field(
-        default=OAUTH_ISSUER,
-        description="Issuer for validating JWT tokens",
-    )
+    # # Issuer for token validation
+    # oauth2_issuer: Sequence[str] = Field(
+    #     default=OAUTH_ISSUER,
+    #     description="Issuer for validating JWT tokens",
+    # )
 
     ############################################################################
     # User agent configuration
@@ -145,21 +154,22 @@ class EsiAuthSettings(BaseSettings):
         """Ensure that the application directories exist."""
         self.app_dir.mkdir(parents=True, exist_ok=True)
         self.log_dir.mkdir(parents=True, exist_ok=True)
-        self.token_store_dir.mkdir(parents=True, exist_ok=True)
-        self.credential_store_dir.mkdir(parents=True, exist_ok=True)
+        self.auth_store_dir.mkdir(parents=True, exist_ok=True)
+        # self.token_store_dir.mkdir(parents=True, exist_ok=True)
+        # self.credential_store_dir.mkdir(parents=True, exist_ok=True)
 
-    @field_validator("oauth2_issuer", mode="before")
-    @classmethod
-    def json_decode(cls, v: Any) -> list[str]:
-        """Decode JSON string to list if necessary."""
-        if isinstance(v, str):
-            try:
-                return json.loads(v)
-            except ValueError:
-                pass
-        if isinstance(v, list):
-            return v  # pyright: ignore[reportUnknownVariableType]
-        raise ValueError("Invalid format for scopes")
+    # @field_validator("oauth2_issuer", mode="before")
+    # @classmethod
+    # def json_decode(cls, v: Any) -> list[str]:
+    #     """Decode JSON string to list if necessary."""
+    #     if isinstance(v, str):
+    #         try:
+    #             return json.loads(v)
+    #         except ValueError:
+    #             pass
+    #     if isinstance(v, list):
+    #         return v  # pyright: ignore[reportUnknownVariableType]
+    #     raise ValueError("Invalid format for scopes")
 
 
 class SettingsManager:
@@ -228,3 +238,8 @@ def get_settings(**kwargs: dict[str, Any]) -> EsiAuthSettings:
     """
     manager = SettingsManager()
     return manager.get_settings(**kwargs)
+
+
+def example_env() -> str:
+    """Create the text of an example env file."""
+    return ""

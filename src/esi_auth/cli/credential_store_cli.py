@@ -7,9 +7,7 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
-from esi_auth.credential_storage import CredentialStoreJson
-from esi_auth.models import EveCredentials
-from esi_auth.settings import get_settings
+from esi_auth.esi_auth import EsiAuth, EveCredentials
 
 app = typer.Typer(
     help="Manage stored EVE Online application credentials.", no_args_is_help=True
@@ -19,7 +17,7 @@ app = typer.Typer(
 @app.command("list", help="List all stored application credentials.")
 def list_credentials(ctx: typer.Context):
     """List all stored application credentials in a table format."""
-    settings = get_settings()
+    # settings = get_settings()
     console = Console()
     table = Table(title="Stored EVE Online Application Credentials")
 
@@ -29,17 +27,17 @@ def list_credentials(ctx: typer.Context):
     table.add_column("Callback URL", style="yellow")
     table.add_column("Scopes", style="white")
 
-    # This is a placeholder for actual credential retrieval logic
-    credential_store = CredentialStoreJson(
-        settings.credential_store_dir / settings.credential_file_name
-    )
-    credentials = credential_store.list_credentials()
+    auth_store: EsiAuth = ctx.obj.auth_store  # type: ignore
+    if auth_store is None:  # pyright: ignore[reportUnnecessaryComparison]
+        console.print("[red]Auth store is not initialized.[/red]")
+        raise typer.Exit(code=1)
+    credentials = auth_store.list_credentials()
 
     for cred in credentials:
         table.add_row(
             cred.name,
-            cred.alias or "",
-            cred.client_id,
+            cred.client_alias or "",
+            str(cred.client_id),
             cred.callback_url,
             ", ".join(cred.scopes),
         )
@@ -63,7 +61,6 @@ def add_credentials(
     ] = None,
 ):
     """Add new application credentials from a JSON file."""
-    settings = get_settings()
     console = Console()
 
     try:
@@ -73,17 +70,18 @@ def add_credentials(
                 alias = cred_json["name"].lower().replace(" ", "_")
             credentials = EveCredentials(
                 name=cred_json["name"],
-                alias=alias,
+                client_alias=alias,
                 client_id=cred_json["clientId"],
                 client_secret=cred_json["clientSecret"],
                 callback_url=cred_json["callbackUrl"],
                 scopes=cred_json["scopes"],
             )
 
-            credential_store = CredentialStoreJson(
-                settings.credential_store_dir / settings.credential_file_name
-            )
-            credential_store.add_credentials(credentials)
+            auth_store: EsiAuth = ctx.obj.auth_store  # type: ignore
+            if auth_store is None:  # pyright: ignore[reportUnnecessaryComparison]
+                console.print("[red]Auth store is not initialized.[/red]")
+                raise typer.Exit(code=1)
+            auth_store.store_credentials(credentials)
             console.print(
                 f"[green]Successfully added credentials for {credentials.name}[/green]"
             )
@@ -92,32 +90,22 @@ def add_credentials(
 
 
 @app.command("remove", help="Remove application credentials by client ID.")
-def remove_credentials(ctx: typer.Context, client_id: str):
+def remove_credentials(ctx: typer.Context, client_id: int):
     """Remove application credentials by client ID."""
-    settings = get_settings()
     console = Console()
 
     try:
-        credential_store = CredentialStoreJson(
-            settings.credential_store_dir / settings.credential_file_name
-        )
-        credential_store.remove_credentials(client_id)
+        auth_store: EsiAuth = ctx.obj.auth_store  # type: ignore
+        if auth_store is None:  # pyright: ignore[reportUnnecessaryComparison]
+            console.print("[red]Auth store is not initialized.[/red]")
+            raise typer.Exit(code=1)
+        credentials = auth_store.get_credentials_from_id(client_id)
+        if credentials is None:
+            console.print(f"[red]No credentials found for client ID {client_id}[/red]")
+            raise typer.Exit(code=1)
+        auth_store.remove_credentials(credentials)
         console.print(
             f"[green]Successfully removed credentials for client ID {client_id}[/green]"
         )
     except Exception as e:
         console.print(f"[red]Error removing credentials: {e}[/red]")
-
-
-@app.command("clear", help="Clear all stored application credentials.")
-def clear_credentials(ctx: typer.Context):
-    """Clear all stored application credentials."""
-    settings = get_settings()
-    console = Console()
-
-    try:
-        file_path = settings.credential_store_dir / settings.credential_file_name
-        file_path.unlink(missing_ok=True)
-        console.print("[green]Successfully cleared all credentials[/green]")
-    except Exception as e:
-        console.print(f"[red]Error clearing credentials: {e}[/red]")

@@ -180,14 +180,22 @@ def version(ctx: typer.Context):
 def reset(ctx: typer.Context):
     """Reset the application by deleting all stored data."""
     console = Console()
+    auth_store: EsiAuth = ctx.obj.auth_store
+    store_path = auth_store.store_path
+    if auth_store is None:  # pyright: ignore[reportUnnecessaryComparison]
+        console.print("[bold red]Error: Auth store is not initialized.")
+        raise typer.Exit(code=1)
     console.print("[bold yellow]Resetting application...")
-    console.print("[bold yellow]This will delete all stored credentials and tokens.")
+    console.print(
+        f"[bold yellow]This will delete all stored credentials and tokens at {auth_store.store_path}."
+    )
     confirm = typer.confirm("Are you sure you want to continue?", default=False)
     if not confirm:
         console.print("[bold red]Reset cancelled.")
         raise typer.Abort()
-    settings = get_settings()
-    app_dir = settings.app_dir
-    console.print(f"[bold yellow]Deleting application directory: {app_dir}")
-    shutil.rmtree(app_dir, ignore_errors=True)
+
+    console.print(f"[bold yellow]Deleting application data at : {store_path}")
+    if store_path is not None and store_path.is_file():
+        store_path.unlink(missing_ok=True)
+    ctx.obj.auth_store = EsiAuth(store_path=store_path)
     console.print("[bold green]Application reset complete.")

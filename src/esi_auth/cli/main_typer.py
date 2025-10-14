@@ -3,6 +3,7 @@
 import shutil
 from dataclasses import dataclass
 from importlib import metadata
+from pathlib import Path
 from time import perf_counter_ns
 from typing import Annotated
 
@@ -10,10 +11,11 @@ import typer
 from rich.console import Console
 
 from esi_auth.esi_auth import AuthStoreException, EsiAuth
-from esi_auth.settings import get_settings
+from esi_auth.settings import DEFAULT_APP_DIR, get_settings
 
 from .credential_store_cli import app as credentials_app
 from .token_store_cli import app as token_store_app
+from .user_agent_cli import app as user_agent_app
 from .util_cli import app as util_app
 
 app = typer.Typer(no_args_is_help=True)
@@ -24,6 +26,7 @@ app.add_typer(
 )
 app.add_typer(token_store_app, name="tokens", help="Manage token storage.")
 app.add_typer(util_app, name="util", help="Utility commands.")
+app.add_typer(user_agent_app, name="user-agent", help="Manage User-Agent settings.")
 
 
 @dataclass
@@ -67,7 +70,21 @@ class CliConfig:
 @app.callback(invoke_without_command=True)
 def default_options(
     ctx: typer.Context,
-    debug: Annotated[bool, typer.Option(help="Enable debug output.")] = False,
+    store_file_path: Annotated[
+        Path,
+        typer.Option(
+            "--store-file-path",
+            "-s",
+            help="Path to the auth store file.",
+            exists=False,
+            file_okay=True,
+            dir_okay=False,
+            writable=True,
+            readable=True,
+            resolve_path=True,
+        ),
+    ] = DEFAULT_APP_DIR / "auth-store.json",
+    debug: Annotated[bool, typer.Option("-d", help="Enable debug output.")] = False,
     verbosity: Annotated[int, typer.Option("-v", help="Verbosity.", count=True)] = 1,
     silent: Annotated[
         bool,
@@ -78,7 +95,16 @@ def default_options(
 
     Insert pithy saying here
     """
-    init_config(ctx, debug=debug, verbosity=verbosity, silent=silent)
+    if any((debug, verbosity > 1, silent)):
+        typer.echo("Debug, verbosity, and silent options are not yet implemented.")
+        raise typer.Exit(code=1)
+    init_config(
+        ctx,
+        store_file_path=store_file_path,
+        debug=debug,
+        verbosity=verbosity,
+        silent=silent,
+    )
     console = Console()
     console.print("[bold]Welcome to esi-auth, a tool for managing EVE SSO tokens.")
 
@@ -91,13 +117,18 @@ def default_options(
 
 
 def init_config(
-    ctx: typer.Context, *, debug: bool, verbosity: int, silent: bool
+    ctx: typer.Context,
+    *,
+    store_file_path: Path,
+    debug: bool,
+    verbosity: int,
+    silent: bool,
 ) -> None:
     """Initialize configuration based on CLI options."""
     start = perf_counter_ns()
     settings = get_settings()
     settings.ensure_app_dir()
-    store_path = settings.auth_store_dir / settings.auth_store_file_name
+    store_path = store_file_path
 
     try:
         # Try to load the auth store. Creates a new store if missing.

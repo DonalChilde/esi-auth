@@ -41,10 +41,10 @@ def add(
     """Add an authorized character to the token store."""
     console = Console()
     console.rule("[bold blue]Add Authorized Character[/bold blue]")
-    # check_user_agent_setup(ctx)
+    check_user_agent_setup(ctx)
     esi_auth: EsiAuth = ctx.obj.auth_store  # type: ignore
     if esi_auth is None:  # pyright: ignore[reportUnnecessaryComparison]
-        console.print("[red]Auth store is not initialized.[/red]")
+        console.print("[bold red]Auth store is not initialized.[/bold red]")
         raise typer.Exit(code=1)
     # Checks for client_id/client_alias presence and mutual exclusivity
     credentials = get_credentials_from_store(
@@ -105,7 +105,7 @@ def remove(
 
     esi_auth: EsiAuth = ctx.obj.auth_store  # type: ignore
     if esi_auth is None:  # pyright: ignore[reportUnnecessaryComparison]
-        console.print("[red]Auth store is not initialized.[/red]")
+        console.print("[bold red]Auth store is not initialized.[/red]")
         raise typer.Exit(code=1)
     # Checks for client_id/client_alias presence and mutual exclusivity
     credentials = get_credentials_from_store(
@@ -118,8 +118,7 @@ def remove(
     )
     if not character_token:
         console.print(
-            f"Character with ID {character_id} not found.",
-            style="bold red",
+            f"[bold red]Character with ID {character_id} not found.[/bold red]",
         )
         raise typer.Exit(code=1)
     esi_auth.remove_token(token=character_token, credentials=credentials)
@@ -163,7 +162,7 @@ def list_characters(
 
     esi_auth: EsiAuth = ctx.obj.auth_store  # type: ignore
     if esi_auth is None:  # pyright: ignore[reportUnnecessaryComparison]
-        console.print("[red]Auth store is not initialized.[/red]")
+        console.print("[bold red]Auth store is not initialized.[/red]")
         raise typer.Exit(code=1)
     # Checks for client_id/client_alias presence and mutual exclusivity
     credentials = get_credentials_from_store(
@@ -201,15 +200,15 @@ def character_list_table(
     for character in characters:
         # Calculate minutes until expiry
         if character.is_expired():
-            status = "[red]EXPIRED[/red]"
-            minutes_text = "[red]Expired[/red]"
+            status = "[bold red]EXPIRED[/red]"
+            minutes_text = "[bold red]Expired[/red]"
         else:
             time_diff = character.expires_at.difference(current_time)
             minutes_until_expiry = time_diff.in_minutes()
 
             if minutes_until_expiry < buffer_minutes:  # Less than buffer time
-                status = "[yellow]EXPIRING[/yellow]"
-                minutes_text = f"[yellow]{minutes_until_expiry:.1f}[/yellow]"
+                status = "[bold yellow]EXPIRING[/yellow]"
+                minutes_text = f"[bold yellow]{minutes_until_expiry:.1f}[/yellow]"
             else:
                 status = "[green]VALID[/green]"
                 minutes_text = f"[green]{minutes_until_expiry:.1f}[/green]"
@@ -233,14 +232,12 @@ def get_credentials_from_store(
     console = Console()
     if all([client_id, client_alias]):
         console.print(
-            "Error: Specify either client ID or client alias, not both.",
-            style="bold red",
+            "[bold red]Error: Specify either client ID or client alias, not both.[/bold red]",
         )
         raise typer.Exit(code=1)
     if not any([client_id, client_alias]):
         console.print(
-            "Error: Either client ID or client alias must be specified.",
-            style="bold red",
+            "[bold red]Error: Either client ID or client alias must be specified.[/bold red]",
         )
         raise typer.Exit(code=1)
     if client_alias:
@@ -251,9 +248,8 @@ def get_credentials_from_store(
         credentials = None
     if not credentials:
         console.print(
-            f"Credentials not found for "
-            f"{f'alias {client_alias}' if client_alias else f'client ID {client_id}'}.",
-            style="bold red",
+            f"[bold red]Credentials not found for "
+            f"{f'alias {client_alias}' if client_alias else f'client ID {client_id}'}.[/bold red]",
         )
         raise typer.Exit(code=1)
     return credentials
@@ -302,19 +298,21 @@ def refresh(
     """
     console = Console()
     console.rule("[bold blue]Refresh Character Tokens[/bold blue]")
-    # check_user_agent_setup(ctx)
+    check_user_agent_setup(ctx)
     if buffer_minutes < 0:
-        console.print("Error: buffer_minutes must be non-negative.", style="bold red")
+        console.print(
+            "[bold red]Error: buffer_minutes must be non-negative.[/bold red]"
+        )
         raise typer.Exit(code=1)
     if buffer_minutes > 20:
         console.print(
-            "Error: buffer_minutes should not exceed 20 minutes.", style="bold red"
+            "[bold red]Error: buffer_minutes should not exceed 20 minutes.[/bold red]"
         )
         raise typer.Exit(code=1)
 
     esi_auth: EsiAuth = ctx.obj.auth_store  # type: ignore
     if esi_auth is None:  # pyright: ignore[reportUnnecessaryComparison]
-        console.print("[red]Auth store is not initialized.[/red]")
+        console.print("[bold red]Auth store is not initialized.[/bold red]")
         raise typer.Exit(code=1)
     # Checks for client_id/client_alias presence and mutual exclusivity
     credentials = get_credentials_from_store(
@@ -330,8 +328,7 @@ def refresh(
         )
         if not character:
             console.print(
-                f"Character with ID {character_id} not found.",
-                style="bold red",
+                f"[bold red]Character with ID {character_id} not found.[/bold red]",
             )
             raise typer.Exit(code=1)
         console.print(f"Before refresh:")

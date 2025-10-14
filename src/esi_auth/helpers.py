@@ -1,12 +1,13 @@
 from importlib import metadata
 
-from .settings import get_settings
 
-
-def get_user_agent() -> str:
+def get_user_agent(
+    character_name: str, user_email: str, user_app_name: str, user_app_version: str
+) -> str:
     """Construct the User-Agent string for HTTP requests."""
-    settings = get_settings()
-    user_portion = f"{settings.user_app_name}/{settings.user_app_version} (eve:{settings.character_name}; {settings.user_email})"
+    user_portion = (
+        f"{user_app_name}/{user_app_version} (eve:{character_name}; {user_email})"
+    )
     app_metadata = metadata.metadata("esi-auth")
     app_name = app_metadata["name"]
     app_version = app_metadata["version"]

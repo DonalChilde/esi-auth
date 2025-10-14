@@ -19,6 +19,9 @@ def list_credentials(ctx: typer.Context):
     """List all stored application credentials in a table format."""
     # settings = get_settings()
     console = Console()
+    console.rule(
+        "[bold blue]List Stored EVE Online Application Credentials[/bold blue]"
+    )
     table = Table(title="Stored EVE Online Application Credentials")
 
     table.add_column("Name", style="cyan", no_wrap=True)
@@ -62,6 +65,7 @@ def add_credentials(
 ):
     """Add new application credentials from a JSON file."""
     console = Console()
+    console.rule("[bold blue]Add Stored EVE Online Application Credentials[/bold blue]")
 
     try:
         with open(file_path) as f:
@@ -86,13 +90,16 @@ def add_credentials(
                 f"[green]Successfully added credentials for {credentials.name}[/green]"
             )
     except Exception as e:
-        console.print(f"[red]Error adding credentials: {e}[/red]")
+        console.print(f"[bold red]Error adding credentials: {e}[/red]")
 
 
 @app.command("remove", help="Remove application credentials by client ID.")
-def remove_credentials(ctx: typer.Context, client_id: int):
+def remove_credentials(ctx: typer.Context, client_id: str):
     """Remove application credentials by client ID."""
     console = Console()
+    console.rule(
+        "[bold blue]Remove Stored EVE Online Application Credentials[/bold blue]"
+    )
 
     try:
         auth_store: EsiAuth = ctx.obj.auth_store  # type: ignore
@@ -108,4 +115,4 @@ def remove_credentials(ctx: typer.Context, client_id: int):
             f"[green]Successfully removed credentials for client ID {client_id}[/green]"
         )
     except Exception as e:
-        console.print(f"[red]Error removing credentials: {e}[/red]")
+        console.print(f"[bold red]Error removing credentials: {e}[/red]")

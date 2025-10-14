@@ -1,7 +1,10 @@
+"""EVE SSO Authentication and Token Management."""
+
 import asyncio
 import logging
 from copy import deepcopy
 from dataclasses import dataclass
+from importlib import metadata
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
@@ -12,6 +15,7 @@ from pydantic import BaseModel, Field, RootModel
 from whenever import Instant
 
 from esi_auth import auth_helpers as AH
+from esi_auth.helpers import get_author_email, get_package_url
 
 OAUTH_METADATA_URL = (
     "https://login.eveonline.com/.well-known/oauth-authorization-server"
@@ -168,10 +172,27 @@ class OauthSettings(BaseModel):
     )
 
 
+class UserAgentSettings(BaseModel):
+    character_name: str = Field(
+        default="Unknown", description="Character name for User-Agent header"
+    )
+
+    user_email: str = Field(
+        default="Unknown", description="User email for User-Agent header"
+    )
+    user_app_name: str = Field(
+        default="Unknown", description="App name for User-Agent header"
+    )
+    user_app_version: str = Field(
+        default="Unknown", description="App version for User-Agent header"
+    )
+
+
 class EsiAuthStore(BaseModel):
     credentials: dict[str, EveCredentials]
     tokens: dict[str, dict[int, CharacterToken]]
     oauth_metadata: OauthSettings
+    user_agent: UserAgentSettings
 
     def save_to_disk(self, file_path: Path | None) -> None:
         """Save the current store to disk atomically.
@@ -222,6 +243,7 @@ class EsiAuth:
                 credentials={},
                 tokens={},
                 oauth_metadata=OauthSettings(),
+                user_agent=UserAgentSettings(),
             )
             self.store = store
         elif self.store_path.is_dir():
@@ -231,13 +253,13 @@ class EsiAuth:
                 credentials={},
                 tokens={},
                 oauth_metadata=OauthSettings(),
+                user_agent=UserAgentSettings(),
             )
             self.store = store
             self._save_store()  # Create new store file
         else:
             self.store = EsiAuthStore.load_from_disk(self.store_path)
         self._jwks_client: PyJWKClient | None = None
-        self._user_agent: str = ""
         self._server_timeout = auth_server_timeout
 
     #############################################################################
@@ -304,7 +326,7 @@ class EsiAuth:
                 authorization_code=code.authorization_code,
                 code_verifier=code.code_verifier,
                 token_endpoint=self.store.oauth_metadata.token_endpoint,
-                user_agent=self._user_agent,
+                user_agent=self.user_agent(),
                 client_session=session,
             )
             validated_token = AH.validate_jwt_token(
@@ -312,7 +334,7 @@ class EsiAuth:
                 jwks_client=self.jwks_client,
                 audience=self.store.oauth_metadata.audience,
                 issuers=self.store.oauth_metadata.issuers,
-                user_agent=self._user_agent,
+                user_agent=self.user_agent(),
             )
             character_token = make_character_token(
                 validated_token=validated_token,
@@ -324,7 +346,7 @@ class EsiAuth:
     @property
     def jwks_client(self) -> PyJWKClient:
         """Lazy init jwks client."""
-        header = {"User-Agent": self._user_agent}
+        header = {"User-Agent": self.user_agent}
         logger.info(f"Fetching JWKS from {self.store.oauth_metadata.jwks_uri}")
         if self._jwks_client is None:
             self._jwks_client = PyJWKClient(
@@ -451,7 +473,7 @@ class EsiAuth:
                     refresh_token=token.refresh_token,
                     client_id=token.client_id,
                     token_endpoint=self.store.oauth_metadata.token_endpoint,
-                    user_agent=self._user_agent,
+                    user_agent=self.user_agent(),
                     client_session=session,
                 )
                 validated_token = AH.validate_jwt_token(
@@ -459,7 +481,7 @@ class EsiAuth:
                     jwks_client=self.jwks_client,
                     audience=self.store.oauth_metadata.audience,
                     issuers=self.store.oauth_metadata.issuers,
-                    user_agent=self._user_agent,
+                    user_agent=self.user_agent(),
                 )
                 updated = make_character_token(
                     validated_token=validated_token,
@@ -506,6 +528,37 @@ class EsiAuth:
     ###############################################################################
     # Helper Methods
     ###############################################################################
+
+    def update_user_agent(
+        self,
+        character_name: str,
+        user_email: str,
+        user_app_name: str,
+        user_app_version: str,
+    ) -> None:
+        """Update the user agent settings."""
+        self.store.user_agent.character_name = character_name
+        self.store.user_agent.user_email = user_email
+        self.store.user_agent.user_app_name = user_app_name
+        self.store.user_agent.user_app_version = user_app_version
+        self._save_store()
+
+    def user_agent(self) -> str:
+        """Construct the User-Agent header string."""
+        user_portion = (
+            f"{self.store.user_agent.user_app_name}/{self.store.user_agent.user_app_version} "
+            f"(eve:{self.store.user_agent.character_name}; {self.store.user_agent.user_email})"
+        )
+        app_metadata = metadata.metadata("esi-auth")
+        app_name = app_metadata["name"]
+        app_version = app_metadata["version"]
+        app_source_url = get_package_url("esi-auth", "Source")
+        _, author_email = get_author_email("esi-auth")
+        esi_auth_portion = (
+            f"{app_name}/{app_version} ({author_email}; +{app_source_url})"
+        )
+        return f"{user_portion} {esi_auth_portion}"
+
     def is_credentials_in_store(self, credentials: EveCredentials) -> bool:
         result = self.store.credentials.get(credentials.client_id, None)
         if result is None:
@@ -527,7 +580,7 @@ class EsiAuth:
     ) -> None:
         """Update the oauth settings."""
         metadata = AH.fetch_oauth_metadata_sync(
-            url=metadata_url, user_agent=self._user_agent
+            url=metadata_url, user_agent=self.user_agent()
         )
         try:
             oauth_settings = OauthSettings(

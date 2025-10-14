@@ -34,6 +34,6 @@ def check_user_agent_setup(ctx: typer.Context) -> None:
         )
         console.print(f"[bold yellow]Before making network requests.")
         console.print(
-            "[bold yellow]Use the 'esi_auth user-agent set' command to configure these fields.[/bold yellow]"
+            "[bold yellow]Use the 'esi-auth user-agent set' command to configure these fields.[/bold yellow]"
         )
         raise typer.Exit(code=1)

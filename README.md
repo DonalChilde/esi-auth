@@ -1,15 +1,18 @@
 # ESI Auth - EVE Online Authentication Library
 
-A simple and robust Python library for managing EVE Online ESI authentication tokens. This library handles the complete OAuth2 authentication flow, token storage, and refresh operations for EVE Online's ESI (EVE Swagger Interface) API.
+A simple and robust Python library for managing EVE Online ESI app credentials and authentication tokens. This library handles the complete OAuth2 authentication flow, token storage, and refresh operations for EVE Online's ESI (EVE Swagger Interface) API.
 
 ## Features
 
-- 🔐 **Complete OAuth2 Flow**: Handles authorization, token exchange, and refresh
-- 💾 **Persistent Storage**: JSON-based token storage with backup/restore capabilities
-- 🔄 **Automatic Token Refresh**: Smart token refresh with configurable timing
-- ⚙️ **Environment Profiles**: Support for configuration through .env files.
+- 🔐 **Complete PKCE OAuth2 Flow**: Handles authorization, token exchange, and refresh
+- 💾 **Persistent Storage**: JSON-based credential and token storage in a single file.
+- 🔄 **Automatic Token Refresh**: Smart token refresh with configurable timing.
 - 🖥️ **CLI Interface**: Full-featured command-line interface
-- 🧪 **Well Tested**: Comprehensive test suite with pytest - WIP
+
+## TODO
+
+- Testing
+- pypi release
 
 ## Installation
 
@@ -20,12 +23,37 @@ Install with pip (once published):
 pip install esi-auth
 ```
 
+Install with uv:
+
+```bash
+# run esi-auth without installing to Path
+uvx --from git+https://github.com/DonalChilde/esi-auth@main esi-auth
+
+# OR
+
+# Install to Path
+uv tool install --from git+https://github.com/DonalChilde/esi-auth@main esi-auth
+# and run
+uvx esi-auth
+
+
+```
+
 Or for development:
 
 ```bash
 git clone https://github.com/DonalChilde/esi-auth.git
 cd esi-auth
 uv sync
+```
+
+For use in a project:
+
+```toml
+# in your pyproject file, for a uv managed project
+dependencies = ["esi-auth"]
+[tool.uv.sources]
+esi-auth = { git = "https://github.com/DonalChilde/esi-auth", branch = "main" }
 ```
 
 ## Quick Start
@@ -39,31 +67,15 @@ First, create an EVE Online application at [EVE Developers](https://developers.e
 3. In that settings view, copy your application settings as json, and save to file.
 4. You can use this file later to import your credentials to esi-auth.
 
-### 2. Configure Environment
+### 2. Setup the Environment
 
-On first run, esi-auth will generate an .env file in the application directory.
-You must set some of the env variables in order to use esi-auth.
-
-Open the .env file in a text editor and set the following values:
-
-```bash
-ESI_AUTH_CHARACTER_NAME=Unknown
-ESI_AUTH_USER_EMAIL=Unknown
-ESI_AUTH_USER_APP_NAME=Unknown
-ESI_AUTH_USER_APP_VERSION=Unknown
-
-```
-
-The .env file must be located in the application directory.
-You can see the app directory by running `esi-auth version`
-
-You can also generate an .example.env file with `esi-auth util generate-example-env`.
+On first run, esi-auth will create a directory in the default application location as defined by Typer. This directory will contain the program logs, and the auth-store.json data file. There is an option to start the cli with a custom location for the auth store file. use the command `esi-auth version` to see the full path to the auth-store.json file.
 
 ### 3. Add your credentials to esi-auth
 
 Add your credentials to esi-auth by running `esi-auth credentials add <path-to-credentials-file>`
 
-For convenience, you can supply an alias for you credentials. If no alias is provided, one will be generated from your app name.
+For convenience, you can supply an alias for you credentials. If no alias is provided, one will be generated from your app name. Aliases and client_id's must be unique within each auth store file.
 
 e.g. `esi-auth credentials add <path-to-credentials-file> -a <short-unique-name-for-your-app>`
 
@@ -75,21 +87,11 @@ From the terminal, run `esi-auth tokens add -i <client_id>` or `esi-auth tokens 
 
 This should open your default browser to the Eve login page.
 
-If it does not, you can either click on the link in the terminal, or see the logs for the url which you can copy and paste into your web browser.
+If it does not, you can either click on the link in the terminal, or see the logs for the url which you can copy and paste into your web browser. If you get a page noit found error for your callback page, try reloading the page. Sometimes the server takes a tick to load up.
 
-## API Reference
+## API Usage
 
-### Core Functions
-
-At present there is only one api function, one function meant to be used by other programs.
-
-#### `get_authorized_characters`
-
-This function will return a dict of CharacterTokens indexed by character id for a specific set of credentials. CharacterToken contains the token needed to make authorization required calls to the Eve ESI.
-The dict is created new with each call to `get_authorized_characters`, changes to the dict will not affect the underlying data store.
-During the call, the characters are checked for expired, or soon to expire tokens, and those tokens are refreshed.
-It is reasonable to call `get_authorized_characters` before each esi call, or group of calls, to ensure there are no problems with token timeout.
-The default `buffer` is 5 minutes. Tokens that have expired, or will expire in less than the `buffer` will be refreshed.
+The primary path for auth store modification should be through the esi-auth CLI. For access to the CharacterTokens from a third party app, that app can use the TokenManager object. This allows a third party app to get a copy of all the tokens for a particular client alias. Each time tokens are requested, the store file will be loaded, and the tokens checked for refresh.
 
 ## License
 

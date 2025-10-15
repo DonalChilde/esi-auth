@@ -688,21 +688,38 @@ class EsiAuth:
             # If no path is set, do nothing, using in-memory store only
 
 
-# def make_split_url(url: str) -> SplitURL:
-#     """Split the callback URL into host, port, and path components.
+class TokenManager:
+    def __init__(self, store_path: Path) -> None:
+        """Initialize the TokenManager with a store path and server timeout.
 
-#     Defaults to localhost:8080/callback if not specified.
+        Args:
+            store_path: Path to the file where the store is saved.
+            auth_server_timeout: Seconds to wait for a reply.
+        """
+        self.store_path = store_path
 
-#     Returns:
-#         A SplitURL object containing host, port, and route.
-#     """
-#     parsed = urlparse(url)
-#     # FIXME remove after testing
-#     print(f"Parsed URL: {parsed!r}")
-#     host = parsed.hostname or "localhost"
-#     port = parsed.port or 8080
-#     route = parsed.path or "/callback"
-#     return SplitURL(scheme=parsed.scheme, host=host, port=port, route=route)
+    def load_esi_auth(self) -> EsiAuth:
+        """Load the EsiAuth instance."""
+        esi_auth = EsiAuth(store_path=self.store_path)
+        return esi_auth
+
+    def get_character_tokens(
+        self, credential_alias: str, buffer: int
+    ) -> list[CharacterToken]:
+        """Get all character tokens from the store.
+
+        Args:
+            credential_alias: The alias of the credentials to use.
+            buffer: Minutes before expiry to consider needing refresh. -1 to skip refresh.
+        Returns:
+            List of CharacterToken instances.
+        """
+        esi_auth = self.load_esi_auth()
+        credentials = esi_auth.get_credentials_from_alias(credential_alias)
+        if credentials is None:
+            return []
+        tokens = esi_auth.get_all_tokens(credentials)
+        return tokens
 
 
 def make_character_token(

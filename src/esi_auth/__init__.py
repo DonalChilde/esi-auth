@@ -9,12 +9,11 @@ from pathlib import Path
 
 import typer
 
-from esi_auth.esi_auth import CharacterToken, EsiAuth, EveCredentials
+from esi_auth.esi_auth import CharacterToken, EsiAuth, EveCredentials, TokenManager
 
 from .logging_config import setup_logging
 
-__all__ = ["EsiAuth", "CharacterToken", "EveCredentials"]
-
+__all__ = ["EsiAuth", "CharacterToken", "EveCredentials", "TokenManager"]
 NAMESPACE = "pfmsoft"
 APPLICATION_NAME = "esi-auth"
 DEFAULT_APP_DIR = Path(typer.get_app_dir(f"{NAMESPACE}-{APPLICATION_NAME}"))

@@ -4,17 +4,22 @@ A simple library for managing EVE Online ESI authentication tokens.
 """
 
 __version__ = "0.1.0"
-
 import logging
+from pathlib import Path
 
-# from .api import get_authorized_characters
+import typer
+
+from esi_auth.esi_auth import CharacterToken, EsiAuth, EveCredentials
+
 from .logging_config import setup_logging
 
-# from .models import CharacterToken
-from .settings import get_settings
+__all__ = ["EsiAuth", "CharacterToken", "EveCredentials"]
 
-# __all__ = ["get_authorized_characters", "CharacterToken"]
+NAMESPACE = "pfmsoft"
+APPLICATION_NAME = "esi-auth"
+DEFAULT_APP_DIR = Path(typer.get_app_dir(f"{NAMESPACE}-{APPLICATION_NAME}"))
+LOG_DIR = DEFAULT_APP_DIR / "logs"
 
-setup_logging(log_dir=get_settings().log_dir)
+setup_logging(log_dir=LOG_DIR)
 logger = logging.getLogger(__name__)
 logger.info("ESI Auth library initialized.")

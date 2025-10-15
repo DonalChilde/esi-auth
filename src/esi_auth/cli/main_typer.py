@@ -10,10 +10,10 @@ import typer
 from rich.console import Console
 from rich.text import Text
 
+from esi_auth import DEFAULT_APP_DIR
 from esi_auth.cli import STYLE_INFO
 from esi_auth.cli.cli_helpers import get_auth_store
 from esi_auth.esi_auth import AuthStoreException, EsiAuth
-from esi_auth.settings import DEFAULT_APP_DIR
 
 from .credential_store_cli import app as credentials_app
 from .token_store_cli import app as token_store_app

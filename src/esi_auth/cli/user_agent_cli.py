@@ -1,10 +1,11 @@
+"""CLI commands for managing user-agent information."""
+
 from typing import Annotated
 
 import typer
 from rich.console import Console
 
 from esi_auth.cli.cli_helpers import get_auth_store
-from esi_auth.esi_auth import EsiAuth
 
 app = typer.Typer(no_args_is_help=True)
 

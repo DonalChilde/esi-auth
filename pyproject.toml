@@ -1,6 +1,6 @@
 [project]
 name = "esi-auth"
-version = "0.1.0"
+version = "0.2.0"
 description = "A simple Eve Online authentication library"
 readme = "README.md"
 authors = [{ name = "Chad Lowe", email = "pfmsoft.dev@gmail.com" }]

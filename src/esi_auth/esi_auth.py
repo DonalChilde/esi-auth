@@ -131,6 +131,15 @@ class CharacterToken(BaseModel):
         buffer_time = self.expires_at.subtract(minutes=buffer_minutes)
         return Instant.now() >= buffer_time
 
+    def minutes_until_expiry(self) -> float:
+        """Get the number of minutes until the token expires.
+
+        Returns:
+            Minutes until expiry as a float. Negative if already expired.
+        """
+        time_diff = self.expires_at.difference(Instant.now())
+        return time_diff.in_minutes()
+
 
 class EveCredentials(BaseModel):
     """EVE SSO application credentials.

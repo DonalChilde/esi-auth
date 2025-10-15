@@ -162,22 +162,6 @@ def init_config(
     ctx.obj = config
 
 
-# def ensure_setup():
-#     """Ensure that the application is properly set up."""
-#     settings = get_settings()
-#     settings.ensure_app_dir()
-#     # token_path = settings.token_store_dir / settings.token_file_name
-#     # if not token_path.is_file():
-#     #     TokenStoreJson.init_store(token_path)
-#     # credentials_path = settings.credential_store_dir / settings.credential_file_name
-#     # if not credentials_path.is_file():
-#     #     CredentialStoreJson.init_store(credentials_path)
-#     # env_path = settings.app_dir / ".env"
-#     # if not env_path.is_file():
-#     #     env_path.parent.mkdir(parents=True, exist_ok=True)
-#     #     env_path.write_text(example_env())
-
-
 @app.command()
 def version(ctx: typer.Context):
     """Display version information."""

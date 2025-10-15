@@ -66,24 +66,6 @@ class EsiAuthSettings(BaseSettings):
         default="auth-store.json", description="File Name for the Auth Store."
     )
 
-    # token_store_dir: Path = Field(
-    #     default=DEFAULT_APP_DIR / "token-store",
-    #     description="Directory for storing token files",
-    # )
-
-    # token_file_name: str = Field(
-    #     default="character_tokens.json",
-    #     description="Filename for storing character tokens",
-    # )
-    # credential_store_dir: Path = Field(
-    #     default=DEFAULT_APP_DIR / "credential-store",
-    #     description="Directory for storing credential files",
-    # )
-    # credential_file_name: str = Field(
-    #     default="app_credentials.json",
-    #     description="Filename for storing application credentials",
-    # )
-
     # HTTP client configuration
     request_timeout: int = Field(
         default=30, description="HTTP request timeout in seconds"
@@ -93,61 +75,10 @@ class EsiAuthSettings(BaseSettings):
         default=300, description="The timeout for the authorization server."
     )
 
-    # # ESI API configuration
-    # esi_base_url: str = Field(
-    #     default="https://esi.evetech.net", description="Base URL for EVE Online ESI API"
-    # )
-
-    # sso_base_url: str = Field(
-    #     default="https://login.eveonline.com", description="Base URL for EVE Online SSO"
-    # )
-
     # Authorization metadata endpoint - https://login.eveonline.com/.well-known/oauth-authorization-server
     oauth2_authorization_metadata_url: str = Field(
         default=OAUTH_METADATA_URL,
         description="URL for OAuth2 authorization server metadata",
-    )
-    # authorization_endpoint: str = Field(
-    #     default=AUTHORIZATION_ENDPOINT,
-    #     description="URL for OAuth2 authorization endpoint",
-    # )
-    # token_endpoint: str = Field(
-    #     default=TOKEN_ENDPOINT,
-    #     description="URL for OAuth2 token endpoint",
-    # )
-    # jwks_uri: str = Field(
-    #     default=JWKS_URI,
-    #     description="URL for OAuth2 JSON Web Key Set (JWKS) endpoint",
-    # )
-
-    # # Audience for token validation
-    # oauth2_audience: str = Field(
-    #     default=OAUTH_AUDIENCE, description="Audience for validating JWT tokens"
-    # )
-
-    # # Issuer for token validation
-    # oauth2_issuer: Sequence[str] = Field(
-    #     default=OAUTH_ISSUER,
-    #     description="Issuer for validating JWT tokens",
-    # )
-
-    ############################################################################
-    # User agent configuration
-    ############################################################################
-
-    # User agent fields
-    character_name: str = Field(
-        default="Unknown", description="Character name for User-Agent header"
-    )
-
-    user_email: str = Field(
-        default="Unknown", description="User email for User-Agent header"
-    )
-    user_app_name: str = Field(
-        default="Unknown", description="App name for User-Agent header"
-    )
-    user_app_version: str = Field(
-        default="Unknown", description="App version for User-Agent header"
     )
 
     def ensure_app_dir(self) -> None:

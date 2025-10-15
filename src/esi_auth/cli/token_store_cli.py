@@ -9,16 +9,22 @@ import typer
 from rich.console import Console
 from rich.table import Table
 from rich.text import Text
-from whenever import Instant
 
 from esi_auth.cli import STYLE_ERROR, STYLE_SUCCESS, STYLE_WARNING
 from esi_auth.esi_auth import CharacterToken, EsiAuth, EveCredentials
 
 from .cli_helpers import check_user_agent_setup
 
+MAX_BUFFER_MINUTES = 20
+MIN_BUFFER_MINUTES = 5
+
 logger = logging.getLogger(__name__)
 
 app = typer.Typer(no_args_is_help=True)
+
+###############################################################################
+# CLI Commands
+###############################################################################
 
 
 @app.command()
@@ -187,76 +193,6 @@ def list_characters(
     console.print(f"\nTotal characters: {len(character_tokens)}")
 
 
-def character_list_table(
-    characters: list[CharacterToken], buffer_minutes: int
-) -> Table:
-    """Helper to create a rich Table of characters."""
-    table = Table(show_header=True, header_style="bold magenta")
-    table.add_column("Character ID", width=12)
-    table.add_column("Character Name", style="cyan", no_wrap=True)
-    table.add_column("Token Status", justify="center", width=12)
-    table.add_column("Minutes Until Expiry", justify="center", width=20)
-
-    current_time = Instant.now()
-
-    for character in characters:
-        # Calculate minutes until expiry
-        if character.is_expired():
-            status = Text("EXPIRED", style=STYLE_ERROR)
-            minutes_text = Text("Expired", style=STYLE_ERROR)
-        else:
-            time_diff = character.expires_at.difference(current_time)
-            minutes_until_expiry = time_diff.in_minutes()
-
-            if minutes_until_expiry < buffer_minutes:  # Less than buffer time
-                status = Text("EXPIRING", style=STYLE_WARNING)
-                minutes_text = Text(f"{minutes_until_expiry:.1f}", style=STYLE_WARNING)
-            else:
-                status = Text("VALID", style=STYLE_SUCCESS)
-                minutes_text = Text(f"{minutes_until_expiry:.1f}", style=STYLE_SUCCESS)
-
-        table.add_row(
-            str(character.character_id),
-            character.character_name,
-            status,
-            minutes_text,
-        )
-    return table
-
-
-def get_credentials_from_store(
-    esi_auth: EsiAuth,
-    client_id: str | None,
-    client_alias: str | None,
-) -> EveCredentials:
-    """Helper to get credential and token stores and validate client info."""
-    # Note: duplicate argument verification code retained for better CLI error messages.
-    console = Console()
-    if all([client_id, client_alias]):
-        console.print(
-            "[bold red]Error: Specify either client ID or client alias, not both.[/bold red]",
-        )
-        raise typer.Exit(code=1)
-    if not any([client_id, client_alias]):
-        console.print(
-            "[bold red]Error: Either client ID or client alias must be specified.[/bold red]",
-        )
-        raise typer.Exit(code=1)
-    if client_alias:
-        credentials = esi_auth.get_credentials_from_alias(client_alias)
-    elif client_id:
-        credentials = esi_auth.get_credentials_from_id(client_id)
-    else:  # Should not be reachable
-        credentials = None
-    if not credentials:
-        console.print(
-            f"[bold red]Credentials not found for "
-            f"{f'alias {client_alias}' if client_alias else f'client ID {client_id}'}.[/bold red]",
-        )
-        raise typer.Exit(code=1)
-    return credentials
-
-
 @app.command()
 def refresh(
     ctx: typer.Context,
@@ -284,14 +220,14 @@ def refresh(
             help="Refresh token for a specific character ID. If not provided, refreshes all characters needing refresh.",
         ),
     ] = None,
-    buffer_minutes: Annotated[
+    min_buffer_minutes: Annotated[
         int,
         typer.Option(
             "-b",
             "--buffer",
-            help="Buffer time in minutes to consider a token as expiring. 20 is the maximum value.",
+            help=f"Buffer time in minutes to consider a token as expiring. {MAX_BUFFER_MINUTES} is the maximum value.",
         ),
-    ] = 5,
+    ] = MIN_BUFFER_MINUTES,
 ):
     """Refresh tokens for authorized characters.
 
@@ -301,13 +237,13 @@ def refresh(
     console = Console()
     console.rule("[bold blue]Refresh Character Tokens[/bold blue]")
     check_user_agent_setup(ctx)
-    if buffer_minutes < 0:
+    if min_buffer_minutes < 0:
         console.print(
-            "[bold red]Error: buffer_minutes must be non-negative.[/bold red]"
+            "[bold red]Error: min_buffer_minutes must be non-negative.[/bold red]"
         )
         raise typer.Exit(code=1)
-    if buffer_minutes > 20:
-        buffer_minutes = 20
+    if min_buffer_minutes > MAX_BUFFER_MINUTES:
+        min_buffer_minutes = MAX_BUFFER_MINUTES
 
     esi_auth: EsiAuth = ctx.obj.auth_store  # type: ignore
     if esi_auth is None:  # pyright: ignore[reportUnnecessaryComparison]
@@ -332,16 +268,19 @@ def refresh(
             raise typer.Exit(code=1)
         console.print(f"Before refresh:")
         table = character_list_table(
-            characters=[character] if character else [], buffer_minutes=buffer_minutes
+            characters=[character] if character else [],
+            buffer_minutes=MIN_BUFFER_MINUTES,
         )
         console.print(table)
         console.print(f"After refresh:")
         refreshed_character = esi_auth.get_token_from_id(
-            credentials=credentials, character_id=character_id, buffer=buffer_minutes
+            credentials=credentials,
+            character_id=character_id,
+            buffer=min_buffer_minutes,
         )
         table = character_list_table(
             characters=[refreshed_character] if refreshed_character else [],
-            buffer_minutes=buffer_minutes,
+            buffer_minutes=MIN_BUFFER_MINUTES,
         )
         console.print(table)
     else:
@@ -350,15 +289,15 @@ def refresh(
         character_tokens = esi_auth.get_all_tokens(credentials=credentials, buffer=-1)
         table = character_list_table(
             characters=character_tokens,
-            buffer_minutes=buffer_minutes,
+            buffer_minutes=MIN_BUFFER_MINUTES,
         )
         console.print(table)
         console.print(f"After refresh:")
         refreshed_characters = esi_auth.get_all_tokens(
-            credentials=credentials, buffer=buffer_minutes
+            credentials=credentials, buffer=min_buffer_minutes
         )
         table = character_list_table(
-            characters=refreshed_characters, buffer_minutes=buffer_minutes
+            characters=refreshed_characters, buffer_minutes=MIN_BUFFER_MINUTES
         )
         console.print(table)
 
@@ -375,3 +314,84 @@ def refresh(
 #     """Restore the database of authorized characters from a backup."""
 #     pass
 #     # TODO implement restore
+
+###############################################################################
+# Helper functions
+###############################################################################
+
+
+def character_list_table(
+    characters: list[CharacterToken], buffer_minutes: int
+) -> Table:
+    """Helper to create a rich Table of characters."""
+    table = Table(show_header=True, header_style="bold magenta")
+    table.add_column("Character ID", width=12)
+    table.add_column("Character Name", style="cyan", no_wrap=True)
+    table.add_column("Token Status", justify="center", width=12)
+    table.add_column("Minutes Until Expiry", justify="center", width=20)
+
+    for character in characters:
+        # Calculate minutes until expiry
+        if character.is_expired():
+            status = Text("EXPIRED", style=STYLE_ERROR)
+            minutes_text = Text("Expired", style=STYLE_ERROR)
+        elif character.needs_refresh(buffer_minutes):  # Less than buffer time
+            status = Text("EXPIRING", style=STYLE_WARNING)
+            minutes_text = Text(
+                f"{character.minutes_until_expiry():.1f}", style=STYLE_WARNING
+            )
+        else:
+            status = Text("VALID", style=STYLE_SUCCESS)
+            minutes_text = Text(
+                f"{character.minutes_until_expiry():.1f}", style=STYLE_SUCCESS
+            )
+
+        table.add_row(
+            str(character.character_id),
+            character.character_name,
+            status,
+            minutes_text,
+        )
+    return table
+
+
+def get_credentials_from_store(
+    esi_auth: EsiAuth,
+    client_id: str | None,
+    client_alias: str | None,
+) -> EveCredentials:
+    """Helper to get credential and token stores and validate client info."""
+    # Note: duplicate argument verification code retained for better CLI error messages.
+    console = Console()
+    if all([client_id, client_alias]):
+        console.print(
+            Text(
+                "Error: Specify either client ID or client alias, not both.",
+                style=STYLE_ERROR,
+            ),
+        )
+        raise typer.Exit(code=1)
+    if not any([client_id, client_alias]):
+        console.print(
+            Text(
+                "Error: Either client ID or client alias must be specified.",
+                style=STYLE_ERROR,
+            ),
+        )
+        raise typer.Exit(code=1)
+    if client_alias:
+        credentials = esi_auth.get_credentials_from_alias(client_alias)
+    elif client_id:
+        credentials = esi_auth.get_credentials_from_id(client_id)
+    else:  # Should not be reachable
+        credentials = None
+    if not credentials:
+        console.print(
+            Text(
+                f"Credentials not found for "
+                f"{f'alias {client_alias}' if client_alias else f'client ID {client_id}'}.",
+                style=STYLE_ERROR,
+            ),
+        )
+        raise typer.Exit(code=1)
+    return credentials

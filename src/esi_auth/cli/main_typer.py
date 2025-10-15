@@ -1,6 +1,5 @@
 """Command line interface for esi-auth."""
 
-import shutil
 from dataclasses import dataclass
 from importlib import metadata
 from pathlib import Path
@@ -9,9 +8,11 @@ from typing import Annotated
 
 import typer
 from rich.console import Console
+from rich.text import Text
 
+from esi_auth.cli import STYLE_INFO
 from esi_auth.esi_auth import AuthStoreException, EsiAuth
-from esi_auth.settings import DEFAULT_APP_DIR, get_settings
+from esi_auth.settings import DEFAULT_APP_DIR
 
 from .credential_store_cli import app as credentials_app
 from .token_store_cli import app as token_store_app
@@ -74,7 +75,7 @@ def default_options(
         Path,
         typer.Option(
             "--store-file-path",
-            "-s",
+            "-f",
             help="Path to the auth store file.",
             exists=False,
             file_okay=True,
@@ -84,6 +85,16 @@ def default_options(
             resolve_path=True,
         ),
     ] = DEFAULT_APP_DIR / "auth-store.json",
+    server_timeout: Annotated[
+        int,
+        typer.Option(
+            "--server-timeout",
+            "-t",
+            help="Timeout in seconds for the auth server to respond.",
+            min=1,
+            max=300,
+        ),
+    ] = 300,
     debug: Annotated[bool, typer.Option("-d", help="Enable debug output.")] = False,
     verbosity: Annotated[int, typer.Option("-v", help="Verbosity.", count=True)] = 1,
     silent: Annotated[
@@ -98,9 +109,11 @@ def default_options(
     if any((debug, verbosity > 1, silent)):
         typer.echo("Debug, verbosity, and silent options are not yet implemented.")
         raise typer.Exit(code=1)
+    print(store_file_path)
     init_config(
         ctx,
         store_file_path=store_file_path,
+        server_timeout=server_timeout,
         debug=debug,
         verbosity=verbosity,
         silent=silent,
@@ -120,28 +133,25 @@ def init_config(
     ctx: typer.Context,
     *,
     store_file_path: Path,
+    server_timeout: int = 300,
     debug: bool,
     verbosity: int,
     silent: bool,
 ) -> None:
     """Initialize configuration based on CLI options."""
     start = perf_counter_ns()
-    settings = get_settings()
-    settings.ensure_app_dir()
     store_path = store_file_path
 
     try:
         # Try to load the auth store. Creates a new store if missing.
-        auth_store = EsiAuth(
-            store_path=store_path, auth_server_timeout=settings.server_timeout
-        )
+        auth_store = EsiAuth(store_path=store_path, auth_server_timeout=server_timeout)
     except AuthStoreException as e:
         console = Console()
         console.print(f"[bold red]Error initializing auth store: {e}")
         raise typer.Exit(code=1) from e
 
     config = CliConfig(
-        app_name=settings.app_name,
+        app_name="Esi Auth",
         version=metadata.version("esi-auth"),
         start_time=start,
         debug=debug,
@@ -172,8 +182,14 @@ def init_config(
 def version(ctx: typer.Context):
     """Display version information."""
     console = Console()
+    console.rule(Text("esi-auth Version Information", style=STYLE_INFO))
+    esi_auth: EsiAuth = ctx.obj.auth_store
+    if esi_auth is None:  # pyright: ignore[reportUnnecessaryComparison]
+        console.print("[bold red]Error: Auth store is not initialized.")
+        raise typer.Exit(code=1)
+
     console.print(f"{ctx.obj.app_name} version {ctx.obj.version}")
-    console.print(f"App directory: {get_settings().app_dir}")
+    console.print(f"Store File: {esi_auth.store_path}")
 
 
 @app.command()

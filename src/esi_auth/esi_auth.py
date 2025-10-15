@@ -25,9 +25,33 @@ logger = logging.getLogger(__name__)
 
 @dataclass(slots=True)
 class SplitURL:
+    scheme: str
     host: str
     port: int
     route: str
+
+    @classmethod
+    def from_url(cls, url: str) -> "SplitURL":
+        """Create a SplitURL from a full URL string.
+
+        port defaults to 8080 if not specified in the URL.
+        """
+        parsed = urlparse(url)
+        host = parsed.hostname or ""
+        port = parsed.port
+        route = parsed.path
+        return SplitURL(
+            scheme=parsed.scheme,
+            host=host,
+            port=port if port is not None else 8080,
+            route=route,
+        )
+
+    def __repr__(self) -> str:
+        return (
+            f"SplitURL(scheme={self.scheme!r}, host={self.host!r}, port={self.port!r}, "
+            f"route={self.route!r})"
+        )
 
 
 @dataclass(slots=True)
@@ -283,48 +307,33 @@ class EsiAuth:
         )
         return auth_request
 
-    def request_authorization_code(
-        self, credentials: EveCredentials, request: AuthRequest
-    ) -> AuthCode:
-        split_url = make_split_url(credentials.callback_url)
-        try:
-            authorization_code = AH.get_authorization_code(
-                expected_state=request.state,
-                callback_host=split_url.host,
-                callback_port=split_url.port,
-                callback_route=split_url.route,
-            )
-        except Exception as e:
-            logger.error(
-                "Got an error while trying to get an authorization code: %s, \n\tcredentials: %r\n\trequest: %r",
-                e,
-                credentials,
-                request,
-            )
-            raise e
-        result = AuthCode(
-            authorization_code=authorization_code, code_verifier=request.code_verifier
-        )
-        return result
-
-    def exchange_code_for_token(
-        self, credentials: EveCredentials, code: AuthCode
+    async def request_character_token(
+        self, credentials: EveCredentials, auth_request: AuthRequest
     ) -> CharacterToken:
-        """Exchange the authorization code for a CharacterToken."""
-        character_token = asyncio.run(
-            self.exchange_code_for_token_async(credentials=credentials, code=code)
-        )
-        return character_token
+        """Request a CharacterToken.
 
-    async def exchange_code_for_token_async(
-        self, credentials: EveCredentials, code: AuthCode
-    ) -> CharacterToken:
-        """Exchange the authorization code for a CharacterToken."""
+        Run a callback server to get the auth code.
+        Request the token from the token endpoint.
+        Validate the JWT token.
+        Create and return a CharacterToken.
+
+        Args:
+            credentials: The application credentials to use.
+            auth_request: The prepared AuthRequest containing the code verifier and state.
+        """
+        split_url = SplitURL.from_url(credentials.callback_url)
+        code = await AH.run_callback_server(
+            expected_state=auth_request.state,
+            callback_host=split_url.host,
+            callback_route=split_url.route,
+            callback_port=split_url.port,
+            timeout=self._server_timeout,
+        )
         async with aiohttp.ClientSession() as session:
             oauth_token = await AH.request_token(
                 client_id=credentials.client_id,
-                authorization_code=code.authorization_code,
-                code_verifier=code.code_verifier,
+                authorization_code=code,
+                code_verifier=auth_request.code_verifier,
                 token_endpoint=self.store.oauth_metadata.token_endpoint,
                 user_agent=self.user_agent(),
                 client_session=session,
@@ -343,10 +352,70 @@ class EsiAuth:
             )
             return character_token
 
+    # def request_authorization_code(
+    #     self, credentials: EveCredentials, request: AuthRequest
+    # ) -> AuthCode:
+    #     split_url = make_split_url(credentials.callback_url)
+    #     try:
+    #         authorization_code = AH.get_authorization_code(
+    #             expected_state=request.state,
+    #             callback_host=split_url.host,
+    #             callback_port=split_url.port,
+    #             callback_route=split_url.route,
+    #         )
+    #     except Exception as e:
+    #         logger.error(
+    #             "Got an error while trying to get an authorization code: %s, \n\tcredentials: %r\n\trequest: %r",
+    #             e,
+    #             credentials,
+    #             request,
+    #         )
+    #         raise e
+    #     result = AuthCode(
+    #         authorization_code=authorization_code, code_verifier=request.code_verifier
+    #     )
+    #     return result
+
+    # def exchange_code_for_token(
+    #     self, credentials: EveCredentials, code: AuthCode
+    # ) -> CharacterToken:
+    #     """Exchange the authorization code for a CharacterToken."""
+    #     character_token = asyncio.run(
+    #         self.exchange_code_for_token_async(credentials=credentials, code=code)
+    #     )
+    #     return character_token
+
+    # async def exchange_code_for_token_async(
+    #     self, credentials: EveCredentials, code: AuthCode
+    # ) -> CharacterToken:
+    #     """Exchange the authorization code for a CharacterToken."""
+    #     async with aiohttp.ClientSession() as session:
+    #         oauth_token = await AH.request_token(
+    #             client_id=credentials.client_id,
+    #             authorization_code=code.authorization_code,
+    #             code_verifier=code.code_verifier,
+    #             token_endpoint=self.store.oauth_metadata.token_endpoint,
+    #             user_agent=self.user_agent(),
+    #             client_session=session,
+    #         )
+    #         validated_token = AH.validate_jwt_token(
+    #             access_token=oauth_token["access_token"],
+    #             jwks_client=self.jwks_client,
+    #             audience=self.store.oauth_metadata.audience,
+    #             issuers=self.store.oauth_metadata.issuers,
+    #             user_agent=self.user_agent(),
+    #         )
+    #         character_token = make_character_token(
+    #             validated_token=validated_token,
+    #             token=oauth_token,
+    #             client_id=credentials.client_id,
+    #         )
+    #         return character_token
+
     @property
     def jwks_client(self) -> PyJWKClient:
         """Lazy init jwks client."""
-        header = {"User-Agent": self.user_agent}
+        header = {"User-Agent": self.user_agent()}
         logger.info(f"Fetching JWKS from {self.store.oauth_metadata.jwks_uri}")
         if self._jwks_client is None:
             self._jwks_client = PyJWKClient(
@@ -610,21 +679,21 @@ class EsiAuth:
             # If no path is set, do nothing, using in-memory store only
 
 
-def make_split_url(url: str) -> SplitURL:
-    """Split the callback URL into host, port, and path components.
+# def make_split_url(url: str) -> SplitURL:
+#     """Split the callback URL into host, port, and path components.
 
-    Defaults to localhost:8080/callback if not specified.
+#     Defaults to localhost:8080/callback if not specified.
 
-    Returns:
-        A SplitURL object containing host, port, and route.
-    """
-    parsed = urlparse(url)
-    # FIXME remove after testing
-    print(f"Parsed URL: {parsed!r}")
-    host = parsed.hostname or "localhost"
-    port = parsed.port or 8080
-    route = parsed.path or "/callback"
-    return SplitURL(host=host, port=port, route=route)
+#     Returns:
+#         A SplitURL object containing host, port, and route.
+#     """
+#     parsed = urlparse(url)
+#     # FIXME remove after testing
+#     print(f"Parsed URL: {parsed!r}")
+#     host = parsed.hostname or "localhost"
+#     port = parsed.port or 8080
+#     route = parsed.path or "/callback"
+#     return SplitURL(scheme=parsed.scheme, host=host, port=port, route=route)
 
 
 def make_character_token(

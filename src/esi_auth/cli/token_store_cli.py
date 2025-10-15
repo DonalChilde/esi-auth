@@ -1,5 +1,6 @@
 """CLI commands for managing the token store."""
 
+import asyncio
 import logging
 import webbrowser
 from typing import Annotated
@@ -7,8 +8,10 @@ from typing import Annotated
 import typer
 from rich.console import Console
 from rich.table import Table
+from rich.text import Text
 from whenever import Instant
 
+from esi_auth.cli import STYLE_ERROR, STYLE_SUCCESS, STYLE_WARNING
 from esi_auth.esi_auth import CharacterToken, EsiAuth, EveCredentials
 
 from .cli_helpers import check_user_agent_setup
@@ -61,11 +64,10 @@ def add(
     console.print(f"[blue]Click Here[/blue]", style=f"link {auth_request.sso_url}")
     console.print("See logs for full URL details.")
     webbrowser.open_new(auth_request.sso_url)
-    auth_code = esi_auth.request_authorization_code(
-        credentials=credentials, request=auth_request
-    )
-    character_token = esi_auth.exchange_code_for_token(
-        credentials=credentials, code=auth_code
+    character_token = asyncio.run(
+        esi_auth.request_character_token(
+            credentials=credentials, auth_request=auth_request
+        )
     )
     console.print(
         f"Successfully authorized character: {character_token.character_name}",
@@ -200,18 +202,18 @@ def character_list_table(
     for character in characters:
         # Calculate minutes until expiry
         if character.is_expired():
-            status = "[bold red]EXPIRED[/red]"
-            minutes_text = "[bold red]Expired[/red]"
+            status = Text("EXPIRED", style=STYLE_ERROR)
+            minutes_text = Text("Expired", style=STYLE_ERROR)
         else:
             time_diff = character.expires_at.difference(current_time)
             minutes_until_expiry = time_diff.in_minutes()
 
             if minutes_until_expiry < buffer_minutes:  # Less than buffer time
-                status = "[bold yellow]EXPIRING[/yellow]"
-                minutes_text = f"[bold yellow]{minutes_until_expiry:.1f}[/yellow]"
+                status = Text("EXPIRING", style=STYLE_WARNING)
+                minutes_text = Text(f"{minutes_until_expiry:.1f}", style=STYLE_WARNING)
             else:
-                status = "[green]VALID[/green]"
-                minutes_text = f"[green]{minutes_until_expiry:.1f}[/green]"
+                status = Text("VALID", style=STYLE_SUCCESS)
+                minutes_text = Text(f"{minutes_until_expiry:.1f}", style=STYLE_SUCCESS)
 
         table.add_row(
             str(character.character_id),
@@ -287,7 +289,7 @@ def refresh(
         typer.Option(
             "-b",
             "--buffer",
-            help="Buffer time in minutes to consider a token as expiring. Not to exceed 20 minutes.",
+            help="Buffer time in minutes to consider a token as expiring. 20 is the maximum value.",
         ),
     ] = 5,
 ):
@@ -305,14 +307,11 @@ def refresh(
         )
         raise typer.Exit(code=1)
     if buffer_minutes > 20:
-        console.print(
-            "[bold red]Error: buffer_minutes should not exceed 20 minutes.[/bold red]"
-        )
-        raise typer.Exit(code=1)
+        buffer_minutes = 20
 
     esi_auth: EsiAuth = ctx.obj.auth_store  # type: ignore
     if esi_auth is None:  # pyright: ignore[reportUnnecessaryComparison]
-        console.print("[bold red]Auth store is not initialized.[/bold red]")
+        console.print(Text("Auth store is not initialized.", style=STYLE_ERROR))
         raise typer.Exit(code=1)
     # Checks for client_id/client_alias presence and mutual exclusivity
     credentials = get_credentials_from_store(

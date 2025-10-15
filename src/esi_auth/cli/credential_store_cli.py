@@ -7,7 +7,8 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
-from esi_auth.esi_auth import EsiAuth, EveCredentials
+from esi_auth.cli.cli_helpers import get_auth_store
+from esi_auth.esi_auth import EveCredentials
 
 app = typer.Typer(
     help="Manage stored EVE Online application credentials.", no_args_is_help=True
@@ -30,10 +31,7 @@ def list_credentials(ctx: typer.Context):
     table.add_column("Callback URL", style="yellow")
     table.add_column("Scopes", style="white")
 
-    auth_store: EsiAuth = ctx.obj.auth_store  # type: ignore
-    if auth_store is None:  # pyright: ignore[reportUnnecessaryComparison]
-        console.print("[red]Auth store is not initialized.[/red]")
-        raise typer.Exit(code=1)
+    auth_store = get_auth_store(ctx)
     credentials = auth_store.list_credentials()
 
     for cred in credentials:
@@ -81,10 +79,7 @@ def add_credentials(
                 scopes=cred_json["scopes"],
             )
 
-            auth_store: EsiAuth = ctx.obj.auth_store  # type: ignore
-            if auth_store is None:  # pyright: ignore[reportUnnecessaryComparison]
-                console.print("[red]Auth store is not initialized.[/red]")
-                raise typer.Exit(code=1)
+            auth_store = get_auth_store(ctx)
             auth_store.store_credentials(credentials)
             console.print(
                 f"[green]Successfully added credentials for {credentials.name}[/green]"
@@ -102,10 +97,7 @@ def remove_credentials(ctx: typer.Context, client_id: str):
     )
 
     try:
-        auth_store: EsiAuth = ctx.obj.auth_store  # type: ignore
-        if auth_store is None:  # pyright: ignore[reportUnnecessaryComparison]
-            console.print("[red]Auth store is not initialized.[/red]")
-            raise typer.Exit(code=1)
+        auth_store = get_auth_store(ctx)
         credentials = auth_store.get_credentials_from_id(client_id)
         if credentials is None:
             console.print(f"[red]No credentials found for client ID {client_id}[/red]")

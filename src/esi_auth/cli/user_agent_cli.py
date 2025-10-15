@@ -3,6 +3,7 @@ from typing import Annotated
 import typer
 from rich.console import Console
 
+from esi_auth.cli.cli_helpers import get_auth_store
 from esi_auth.esi_auth import EsiAuth
 
 app = typer.Typer(no_args_is_help=True)
@@ -27,10 +28,7 @@ def set_user_agent(
     """Set user-agent information for the application."""
     console = Console()
     console.rule("[bold blue]Set User Agent Fields[/bold blue]")
-    esi_auth: EsiAuth = ctx.obj.auth_store  # type: ignore
-    if esi_auth is None:  # pyright: ignore[reportUnnecessaryComparison]
-        console.print("[bold red]Auth store is not initialized.")
-        raise typer.Exit(code=1)
+    esi_auth = get_auth_store(ctx)
     esi_auth.update_user_agent(
         character_name=character_name,
         user_email=user_email,

@@ -11,6 +11,7 @@ from rich.console import Console
 from rich.text import Text
 
 from esi_auth.cli import STYLE_INFO
+from esi_auth.cli.cli_helpers import get_auth_store
 from esi_auth.esi_auth import AuthStoreException, EsiAuth
 from esi_auth.settings import DEFAULT_APP_DIR
 
@@ -167,11 +168,7 @@ def version(ctx: typer.Context):
     """Display version information."""
     console = Console()
     console.rule(Text("esi-auth Version Information", style=STYLE_INFO))
-    esi_auth: EsiAuth = ctx.obj.auth_store
-    if esi_auth is None:  # pyright: ignore[reportUnnecessaryComparison]
-        console.print("[bold red]Error: Auth store is not initialized.")
-        raise typer.Exit(code=1)
-
+    esi_auth = get_auth_store(ctx)
     console.print(f"{ctx.obj.app_name} version {ctx.obj.version}")
     console.print(f"Store File: {esi_auth.store_path}")
 
@@ -180,14 +177,11 @@ def version(ctx: typer.Context):
 def reset(ctx: typer.Context):
     """Reset the application by deleting all stored data."""
     console = Console()
-    auth_store: EsiAuth = ctx.obj.auth_store
-    store_path = auth_store.store_path
-    if auth_store is None:  # pyright: ignore[reportUnnecessaryComparison]
-        console.print("[bold red]Error: Auth store is not initialized.")
-        raise typer.Exit(code=1)
+    esi_auth = get_auth_store(ctx)
+    store_path = esi_auth.store_path
     console.print("[bold yellow]Resetting application...")
     console.print(
-        f"[bold yellow]This will delete all stored credentials and tokens at {auth_store.store_path}."
+        f"[bold yellow]This will delete all stored credentials and tokens at {store_path}."
     )
     confirm = typer.confirm("Are you sure you want to continue?", default=False)
     if not confirm:

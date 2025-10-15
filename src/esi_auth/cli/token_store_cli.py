@@ -13,7 +13,7 @@ from rich.text import Text
 from esi_auth.cli import STYLE_ERROR, STYLE_SUCCESS, STYLE_WARNING
 from esi_auth.esi_auth import CharacterToken, EsiAuth, EveCredentials
 
-from .cli_helpers import check_user_agent_setup
+from .cli_helpers import check_user_agent_setup, get_auth_store
 
 MAX_BUFFER_MINUTES = 20
 MIN_BUFFER_MINUTES = 5
@@ -51,10 +51,7 @@ def add(
     console = Console()
     console.rule("[bold blue]Add Authorized Character[/bold blue]")
     check_user_agent_setup(ctx)
-    esi_auth: EsiAuth = ctx.obj.auth_store  # type: ignore
-    if esi_auth is None:  # pyright: ignore[reportUnnecessaryComparison]
-        console.print("[bold red]Auth store is not initialized.[/bold red]")
-        raise typer.Exit(code=1)
+    esi_auth = get_auth_store(ctx)
     # Checks for client_id/client_alias presence and mutual exclusivity
     credentials = get_credentials_from_store(
         esi_auth=esi_auth,
@@ -111,10 +108,7 @@ def remove(
     console = Console()
     console.rule("[bold blue]Remove Authorized Character[/bold blue]")
 
-    esi_auth: EsiAuth = ctx.obj.auth_store  # type: ignore
-    if esi_auth is None:  # pyright: ignore[reportUnnecessaryComparison]
-        console.print("[bold red]Auth store is not initialized.[/red]")
-        raise typer.Exit(code=1)
+    esi_auth = get_auth_store(ctx)
     # Checks for client_id/client_alias presence and mutual exclusivity
     credentials = get_credentials_from_store(
         esi_auth=esi_auth,
@@ -168,10 +162,7 @@ def list_characters(
     console = Console()
     console.rule("[bold blue]List Authorized Characters[/bold blue]")
 
-    esi_auth: EsiAuth = ctx.obj.auth_store  # type: ignore
-    if esi_auth is None:  # pyright: ignore[reportUnnecessaryComparison]
-        console.print("[bold red]Auth store is not initialized.[/red]")
-        raise typer.Exit(code=1)
+    esi_auth = get_auth_store(ctx)
     # Checks for client_id/client_alias presence and mutual exclusivity
     credentials = get_credentials_from_store(
         esi_auth=esi_auth,
@@ -245,10 +236,7 @@ def refresh(
     if min_buffer_minutes > MAX_BUFFER_MINUTES:
         min_buffer_minutes = MAX_BUFFER_MINUTES
 
-    esi_auth: EsiAuth = ctx.obj.auth_store  # type: ignore
-    if esi_auth is None:  # pyright: ignore[reportUnnecessaryComparison]
-        console.print(Text("Auth store is not initialized.", style=STYLE_ERROR))
-        raise typer.Exit(code=1)
+    esi_auth = get_auth_store(ctx)
     # Checks for client_id/client_alias presence and mutual exclusivity
     credentials = get_credentials_from_store(
         esi_auth=esi_auth,

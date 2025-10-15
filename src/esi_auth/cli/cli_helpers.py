@@ -2,7 +2,9 @@
 
 import typer
 from rich.console import Console
+from rich.text import Text
 
+from esi_auth.cli import STYLE_ERROR
 from esi_auth.esi_auth import EsiAuth
 
 
@@ -37,3 +39,26 @@ def check_user_agent_setup(ctx: typer.Context) -> None:
             "[bold yellow]Use the 'esi-auth user-agent set' command to configure these fields.[/bold yellow]"
         )
         raise typer.Exit(code=1)
+
+
+def get_auth_store(ctx: typer.Context) -> EsiAuth:
+    """Retrieve the EsiAuth instance from the CLI context.
+
+    Args:
+        ctx: The Typer context containing the EsiAuth instance.
+
+    Returns:
+        The EsiAuth instance.
+
+    Raises:
+        typer.Exit: If the EsiAuth instance is not initialized.
+    """
+    auth_store: EsiAuth = ctx.obj.auth_store
+    if auth_store is None:  # pyright: ignore[reportUnnecessaryComparison]
+        console = Console()
+        console.print(
+            Text("[bold red]Auth store is not initialized.[/bold red]"),
+            style=STYLE_ERROR,
+        )
+        raise typer.Exit(code=1)
+    return auth_store

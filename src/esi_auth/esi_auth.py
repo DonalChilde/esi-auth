@@ -48,6 +48,7 @@ class SplitURL:
         )
 
     def __repr__(self) -> str:
+        """Represent the SplitURL as a string."""
         return (
             f"SplitURL(scheme={self.scheme!r}, host={self.host!r}, port={self.port!r}, "
             f"route={self.route!r})"
@@ -361,66 +362,6 @@ class EsiAuth:
             )
             return character_token
 
-    # def request_authorization_code(
-    #     self, credentials: EveCredentials, request: AuthRequest
-    # ) -> AuthCode:
-    #     split_url = make_split_url(credentials.callback_url)
-    #     try:
-    #         authorization_code = AH.get_authorization_code(
-    #             expected_state=request.state,
-    #             callback_host=split_url.host,
-    #             callback_port=split_url.port,
-    #             callback_route=split_url.route,
-    #         )
-    #     except Exception as e:
-    #         logger.error(
-    #             "Got an error while trying to get an authorization code: %s, \n\tcredentials: %r\n\trequest: %r",
-    #             e,
-    #             credentials,
-    #             request,
-    #         )
-    #         raise e
-    #     result = AuthCode(
-    #         authorization_code=authorization_code, code_verifier=request.code_verifier
-    #     )
-    #     return result
-
-    # def exchange_code_for_token(
-    #     self, credentials: EveCredentials, code: AuthCode
-    # ) -> CharacterToken:
-    #     """Exchange the authorization code for a CharacterToken."""
-    #     character_token = asyncio.run(
-    #         self.exchange_code_for_token_async(credentials=credentials, code=code)
-    #     )
-    #     return character_token
-
-    # async def exchange_code_for_token_async(
-    #     self, credentials: EveCredentials, code: AuthCode
-    # ) -> CharacterToken:
-    #     """Exchange the authorization code for a CharacterToken."""
-    #     async with aiohttp.ClientSession() as session:
-    #         oauth_token = await AH.request_token(
-    #             client_id=credentials.client_id,
-    #             authorization_code=code.authorization_code,
-    #             code_verifier=code.code_verifier,
-    #             token_endpoint=self.store.oauth_metadata.token_endpoint,
-    #             user_agent=self.user_agent(),
-    #             client_session=session,
-    #         )
-    #         validated_token = AH.validate_jwt_token(
-    #             access_token=oauth_token["access_token"],
-    #             jwks_client=self.jwks_client,
-    #             audience=self.store.oauth_metadata.audience,
-    #             issuers=self.store.oauth_metadata.issuers,
-    #             user_agent=self.user_agent(),
-    #         )
-    #         character_token = make_character_token(
-    #             validated_token=validated_token,
-    #             token=oauth_token,
-    #             client_id=credentials.client_id,
-    #         )
-    #         return character_token
-
     @property
     def jwks_client(self) -> PyJWKClient:
         """Lazy init jwks client."""
@@ -436,15 +377,28 @@ class EsiAuth:
     # Credential Storage Methods
     #############################################################################
     def store_credentials(self, credentials: EveCredentials) -> None:
+        """Store new application credentials.
+
+        Args:
+            credentials: The EveCredentials to store.
+        """
         if self.is_credentials_in_store(credentials):
             raise AuthStoreException(
                 f"Client_id {credentials.client_id} already exists in store. Remove "
-                "credentials first. Note: this will remove associated token."
+                "credentials first. Note: this will remove associated tokens."
             )
         self.store.credentials[credentials.client_id] = credentials
         self._save_store()
 
     def remove_credentials(self, credentials: EveCredentials) -> bool:
+        """Remove application credentials and associated tokens.
+
+        Args:
+            credentials: The EveCredentials to remove.
+
+        Returns:
+            True if credentials were removed, False if they were not found.
+        """
         if self.is_credentials_in_store(credentials):
             self.store.credentials.pop(credentials.client_id, None)
             self.store.tokens.pop(credentials.client_id, None)
@@ -453,15 +407,26 @@ class EsiAuth:
         return False
 
     def list_credentials(self) -> list[EveCredentials]:
+        """List all stored application credentials."""
         creds = deepcopy(list(self.store.credentials.values()))
         return creds
 
     def get_credentials_from_id(self, client_id: str) -> EveCredentials | None:
+        """Get credentials by client ID.
+
+        Args:
+            client_id: The client ID of the credentials to retrieve.
+        """
         if client_id in self.store.credentials:
             return deepcopy(self.store.credentials[client_id])
         return None
 
     def get_credentials_from_alias(self, client_alias: str) -> EveCredentials | None:
+        """Get credentials by client alias.
+
+        Args:
+            client_alias: The client alias of the credentials to retrieve.
+        """
         for creds in self.store.credentials.values():
             if creds.client_alias == client_alias:
                 return deepcopy(creds)
@@ -471,6 +436,12 @@ class EsiAuth:
     # Token Storage Methods
     #############################################################################
     def store_token(self, token: CharacterToken, credentials: EveCredentials) -> None:
+        """Store a character token.
+
+        Args:
+            token: The CharacterToken to store.
+            credentials: The EveCredentials associated with the token.
+        """
         if token.client_id != credentials.client_id:
             raise AuthStoreException(
                 "Tried to store a token with incorrect credentials."
@@ -485,6 +456,15 @@ class EsiAuth:
         self._save_store()
 
     def remove_token(self, token: CharacterToken, credentials: EveCredentials) -> bool:
+        """Remove a character token.
+
+        Args:
+            token: The CharacterToken to remove.
+            credentials: The EveCredentials associated with the token.
+
+        Returns:
+            True if the token was removed, False if it was not found.
+        """
         if self.is_token_in_store(token=token, credentials=credentials):
             self.store.tokens.get(credentials.client_id, {}).pop(
                 token.character_id, None
@@ -494,6 +474,14 @@ class EsiAuth:
         return False
 
     def list_tokens(self, credentials: EveCredentials) -> list[CharacterToken]:
+        """List all stored character tokens for given credentials.
+
+        Args:
+            credentials: The EveCredentials associated with the tokens.
+
+        Returns:
+            List of CharacterToken instances.
+        """
         if credentials.client_id not in self.store.credentials:
             raise AuthStoreException(
                 "Tried to list tokens before adding credentials to store."
@@ -504,6 +492,16 @@ class EsiAuth:
     def get_token_from_id(
         self, character_id: int, credentials: EveCredentials, buffer: int = 5
     ) -> CharacterToken | None:
+        """Get a character token by character ID.
+
+        Args:
+            character_id: The character ID of the token to retrieve.
+            credentials: The EveCredentials associated with the token.
+            buffer: Minutes before expiry to consider needing refresh. -1 to skip refresh.
+
+        Returns:
+            The CharacterToken if found, None otherwise.
+        """
         if credentials.client_id not in self.store.credentials:
             raise AuthStoreException(
                 "Tried to get token before adding credentials to store."
@@ -542,6 +540,7 @@ class EsiAuth:
     async def _refresh_token(
         self, token: CharacterToken, session: aiohttp.ClientSession | None = None
     ) -> CharacterToken:
+        """Refresh a single token."""
         if session is None:
             session = aiohttp.ClientSession()
 
@@ -575,6 +574,15 @@ class EsiAuth:
     def get_all_tokens(
         self, credentials: EveCredentials, buffer: int = 5
     ) -> list[CharacterToken]:
+        """Get all character tokens for given credentials.
+
+        Args:
+            credentials: The EveCredentials associated with the tokens.
+            buffer: Minutes before expiry to consider needing refresh. -1 to skip refresh.
+
+        Returns:
+            List of CharacterToken instances.
+        """
         if self.is_credentials_in_store(credentials):
             tokens = self.store.tokens.get(credentials.client_id, {})
             copied_tokens = deepcopy(list(tokens.values()))
@@ -638,6 +646,7 @@ class EsiAuth:
         return f"{user_portion} {esi_auth_portion}"
 
     def is_credentials_in_store(self, credentials: EveCredentials) -> bool:
+        """Check if credentials are in the store."""
         result = self.store.credentials.get(credentials.client_id, None)
         if result is None:
             return False
@@ -646,6 +655,7 @@ class EsiAuth:
     def is_token_in_store(
         self, token: CharacterToken, credentials: EveCredentials
     ) -> bool:
+        """Check if a character token is in the store."""
         if not self.is_credentials_in_store(credentials):
             raise AuthStoreException(
                 "Tried to use credentials that were not in the store."
@@ -711,6 +721,7 @@ class TokenManager:
         Args:
             credential_alias: The alias of the credentials to use.
             buffer: Minutes before expiry to consider needing refresh. -1 to skip refresh.
+
         Returns:
             List of CharacterToken instances.
         """
@@ -730,6 +741,7 @@ def make_character_token(
     Args:
         validated_token: The validated JWT token payload.
         token: The raw token data from the token endpoint.
+        client_id: The client ID associated with the token.
 
     Returns:
         CharacterToken: The constructed CharacterToken instance.

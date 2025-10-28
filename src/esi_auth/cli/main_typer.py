@@ -21,14 +21,18 @@ from .user_agent_cli import app as user_agent_app
 from .util_cli import app as util_app
 
 app = typer.Typer(no_args_is_help=True)
-
-
 app.add_typer(
     credentials_app, name="credentials", help="Manage application credentials."
 )
 app.add_typer(token_store_app, name="tokens", help="Manage token storage.")
 app.add_typer(util_app, name="util", help="Utility commands.")
 app.add_typer(user_agent_app, name="user-agent", help="Manage User-Agent settings.")
+
+# TODO Load and use settings from a config file, environment variables, etc.
+# Allowing .env loading from working directory will allow third party tools to
+# set configuration without modifying global or user config files.
+
+# TODO init logging from this file.
 
 
 @dataclass

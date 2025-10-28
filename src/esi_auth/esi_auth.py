@@ -871,7 +871,7 @@ class EsiAuth:
     def _save_store(self) -> None:
         # TODO refactor when multiple store types are supported
         # Save the current store to disk if a path is set
-        if self.store_path is not None:
+        if self.store_path is not None:  # type: ignore
             self.store.save_to_disk(self.store_path)
         else:
             pass

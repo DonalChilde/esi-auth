@@ -12,7 +12,7 @@ from rich.text import Text
 
 from esi_auth import DEFAULT_APP_DIR
 from esi_auth.cli import STYLE_INFO
-from esi_auth.cli.cli_helpers import get_auth_store
+from esi_auth.cli.cli_helpers import esi_auth_getter
 from esi_auth.esi_auth import AuthStoreException, EsiAuth
 
 from .credential_store_cli import app as credentials_app
@@ -39,7 +39,7 @@ class CliConfig:
     debug: bool = False
     verbosity: int = 1
     silent: bool = False
-    auth_store: EsiAuth | None = None
+    esi_auth: EsiAuth | None = None
 
     def __repr__(self) -> str:
         """Return a string representation of the CLI configuration."""
@@ -51,7 +51,7 @@ class CliConfig:
             f"debug={self.debug!r}, "
             f"verbosity={self.verbosity!r}, "
             f"silent={self.silent!r}, "
-            f"auth_store={self.auth_store.store_path if self.auth_store else None}"
+            f"esi_auth={self.esi_auth.store_path if self.esi_auth else None}"
             ")"
         )
 
@@ -65,7 +65,7 @@ class CliConfig:
             f" \tdebug={self.debug}\n"
             f" \tverbosity={self.verbosity}\n"
             f" \tsilent={self.silent}"
-            f" \tauth_store={self.auth_store.store_path if self.auth_store else None}\n"
+            f" \tesi_auth={self.esi_auth.store_path if self.esi_auth else None}\n"
         )
 
 
@@ -141,11 +141,14 @@ def init_config(
 ) -> None:
     """Initialize configuration based on CLI options."""
     start = perf_counter_ns()
-    store_path = store_file_path
 
     try:
         # Try to load the auth store. Creates a new store if missing.
-        auth_store = EsiAuth(store_path=store_path, auth_server_timeout=server_timeout)
+        # TODO refactor when multiple store types are supported.
+        esi_auth = EsiAuth(
+            connection_string=f"esi-auth-file:{store_file_path.resolve()}",
+            auth_server_timeout=server_timeout,
+        )
     except AuthStoreException as e:
         console = Console()
         console.print(f"[bold red]Error initializing auth store: {e}")
@@ -158,7 +161,7 @@ def init_config(
         debug=debug,
         verbosity=verbosity,
         silent=silent,
-        auth_store=auth_store,
+        esi_auth=esi_auth,
     )
     ctx.obj = config
 
@@ -168,7 +171,7 @@ def version(ctx: typer.Context):
     """Display version information."""
     console = Console()
     console.rule(Text("esi-auth Version Information", style=STYLE_INFO))
-    esi_auth = get_auth_store(ctx)
+    esi_auth = esi_auth_getter(ctx)
     console.print(f"{ctx.obj.app_name} version {ctx.obj.version}")
     console.print(f"Store File: {esi_auth.store_path}")
 
@@ -176,8 +179,9 @@ def version(ctx: typer.Context):
 @app.command()
 def reset(ctx: typer.Context):
     """Reset the application by deleting all stored data."""
+    # TODO refactor this when multiple store types are supported.
     console = Console()
-    esi_auth = get_auth_store(ctx)
+    esi_auth = esi_auth_getter(ctx)
     store_path = esi_auth.store_path
     console.print("[bold yellow]Resetting application...")
     console.print(
@@ -189,7 +193,9 @@ def reset(ctx: typer.Context):
         raise typer.Abort()
 
     console.print(f"[bold yellow]Deleting application data at : {store_path}")
-    if store_path is not None and store_path.is_file():
+    if store_path is not None and store_path.is_file():  # type: ignore
         store_path.unlink(missing_ok=True)
-    ctx.obj.auth_store = EsiAuth(store_path=store_path)
+    ctx.obj.esi_auth = EsiAuth(
+        connection_string=f"esi-auth-file:{store_path.resolve()}"
+    )
     console.print("[bold green]Application reset complete.")

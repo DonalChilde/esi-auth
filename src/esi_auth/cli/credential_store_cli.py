@@ -7,7 +7,7 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
-from esi_auth.cli.cli_helpers import get_auth_store
+from esi_auth.cli.cli_helpers import esi_auth_getter
 from esi_auth.esi_auth import EveCredentials
 
 app = typer.Typer(
@@ -31,7 +31,7 @@ def list_credentials(ctx: typer.Context):
     table.add_column("Callback URL", style="yellow")
     table.add_column("Scopes", style="white")
 
-    auth_store = get_auth_store(ctx)
+    auth_store = esi_auth_getter(ctx)
     credentials = auth_store.list_credentials()
 
     for cred in credentials:
@@ -79,7 +79,7 @@ def add_credentials(
                 scopes=cred_json["scopes"],
             )
 
-            auth_store = get_auth_store(ctx)
+            auth_store = esi_auth_getter(ctx)
             auth_store.store_credentials(credentials)
             console.print(
                 f"[green]Successfully added credentials for {credentials.name}[/green]"
@@ -97,7 +97,7 @@ def remove_credentials(ctx: typer.Context, client_id: str):
     )
 
     try:
-        auth_store = get_auth_store(ctx)
+        auth_store = esi_auth_getter(ctx)
         credentials = auth_store.get_credentials_from_id(client_id)
         if credentials is None:
             console.print(f"[red]No credentials found for client ID {client_id}[/red]")

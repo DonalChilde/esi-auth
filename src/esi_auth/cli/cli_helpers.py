@@ -41,7 +41,7 @@ def check_user_agent_setup(ctx: typer.Context) -> None:
         raise typer.Exit(code=1)
 
 
-def get_auth_store(ctx: typer.Context) -> EsiAuth:
+def esi_auth_getter(ctx: typer.Context) -> EsiAuth:
     """Retrieve the EsiAuth instance from the CLI context.
 
     Args:
@@ -53,12 +53,12 @@ def get_auth_store(ctx: typer.Context) -> EsiAuth:
     Raises:
         typer.Exit: If the EsiAuth instance is not initialized.
     """
-    auth_store: EsiAuth = ctx.obj.auth_store
-    if auth_store is None:  # pyright: ignore[reportUnnecessaryComparison]
+    esi_auth: EsiAuth = ctx.obj.esi_auth
+    if esi_auth is None:  # pyright: ignore[reportUnnecessaryComparison]
         console = Console()
         console.print(
             Text("[bold red]Auth store is not initialized.[/bold red]"),
             style=STYLE_ERROR,
         )
         raise typer.Exit(code=1)
-    return auth_store
+    return esi_auth

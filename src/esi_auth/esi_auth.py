@@ -6,12 +6,13 @@ from copy import deepcopy
 from dataclasses import dataclass
 from importlib import metadata
 from pathlib import Path
-from typing import Any
+from typing import Any, List
 from urllib.parse import urlparse
 
 import aiohttp
 from jwt import PyJWKClient
 from pydantic import BaseModel, Field, RootModel
+from typing_extensions import Protocol
 from whenever import Instant
 
 from esi_auth import auth_helpers as AH
@@ -260,8 +261,175 @@ class EsiAuthStore(BaseModel):
             raise OSError(f"Failed to load store from disk: {e}") from e
 
 
+class EsiAuthStoreProviderProtocol(Protocol):
+    def connect(self, connection_string: str) -> EsiAuthStore:
+        """Connect to an EsiAuth store.
+
+        Args:
+            connection_string: The string that describes the type and location of a store.
+        """
+        ...
+
+    def add_credentials(self, credentials: EveCredentials) -> None:
+        """Add new application credentials.
+
+        Args:
+            credentials: The EveCredentials to store.
+        """
+        ...
+
+    def remove_credentials(self, credentials: EveCredentials) -> bool:
+        """Remove application credentials and associated tokens.
+
+        Args:
+            credentials: The EveCredentials to remove.
+        """
+        ...
+
+    def list_credentials(self) -> list[EveCredentials]:
+        """List all stored application credentials."""
+        ...
+
+    def get_credentials_from_id(self, client_id: str) -> EveCredentials | None:
+        """Get credentials by client ID.
+
+        Args:
+            client_id: The client ID of the credentials to retrieve.
+        """
+        ...
+
+    def get_credentials_from_alias(self, client_alias: str) -> EveCredentials | None:
+        """Get credentials by client alias.
+
+        Args:
+            client_alias: The client alias of the credentials to retrieve.
+        """
+        ...
+
+    def add_token(self, token: CharacterToken, credentials: EveCredentials) -> None:
+        """Store a character token.
+
+        Args:
+            token: The CharacterToken to store.
+            credentials: The EveCredentials associated with the token.
+        """
+        ...
+
+    def remove_token(self, token: CharacterToken, credentials: EveCredentials) -> bool:
+        """Remove a character token.
+
+        Args:
+            token: The CharacterToken to remove.
+            credentials: The EveCredentials associated with the token.
+        """
+        ...
+
+    def list_tokens(self, credentials: EveCredentials) -> list[CharacterToken]:
+        """List all stored character tokens for given credentials.
+
+        Args:
+            credentials: The EveCredentials associated with the tokens.
+        """
+        ...
+
+    def get_token(
+        self, character_id: int, credentials: EveCredentials, buffer: int = 5
+    ) -> CharacterToken | None:
+        """Get a character token by character ID.
+
+        Args:
+            character_id: The character ID of the token to retrieve.
+            credentials: The EveCredentials associated with the token.
+            buffer: Minutes before expiry to consider needing refresh. -1 to skip refresh.
+        """
+        ...
+
+    def get_tokens(
+        self, credentials: EveCredentials, buffer: int = 5
+    ) -> list[CharacterToken]:
+        """Get all character tokens for given credentials.
+
+        Args:
+            credentials: The EveCredentials associated with the tokens.
+            buffer: Minutes before expiry to consider needing refresh. -1 to skip refresh.
+        """
+        ...
+
+    def get_user_agent(self) -> UserAgentSettings:
+        """Get the User-Agent string for requests."""
+        ...
+
+    def update_user_agent(
+        self,
+        character_name: str,
+        user_email: str,
+        user_app_name: str,
+        user_app_version: str,
+    ) -> None:
+        """Update the user agent settings."""
+        ...
+
+    def get_oauth_settings(self) -> OauthSettings:
+        """Get the OAuth settings."""
+        ...
+
+    def update_oauth_settings(self, settings: OauthSettings) -> None:
+        """Update the OAuth settings."""
+        ...
+
+
+def connect_auth_store(connection_string: str) -> EsiAuthStore:
+    """Connect to an EsiAuth store.
+
+    Right now, this only supports file-based stores, but will later
+    return EsiAuthStoreProviderProtocol implementations based on the
+    connection string.
+
+    TODO: list valid connection strings, with examples.
+    - esi-auth-memory:<must be present, but is not used> In-memory store (not implemented yet)
+    - esi-auth-file:<file_path>: File-based store
+    - esi-auth-sqlite:<db_path>: SQLite-based store (not implemented yet)
+
+    Args:
+        connection_string: The string that describes the type and location of a store.
+    """
+    if not ":" in connection_string:
+        raise ValueError("Invalid connection string format.")
+    split_uri = connection_string.split(":", 1)
+    if len(split_uri) != 2:
+        raise ValueError("Invalid connection string format.")
+    connection_type, conn_str = split_uri
+    match connection_type:
+        case "esi-auth-memory":
+            raise NotImplementedError("In-memory store not implemented yet.")
+        case "esi-auth-file":
+            try:
+                file_path = Path(conn_str)
+            except Exception as e:
+                raise ValueError(f"Failed to parse file path: {e}") from e
+            if file_path.is_dir():
+                raise AuthStoreException(f"store_path {file_path} is a directory.")
+            if file_path.is_file():
+                return EsiAuthStore.load_from_disk(file_path)
+            else:
+                logger.info(
+                    f"Tried to load a store file that doesnt exist from {file_path}.)"
+                )
+                auth_store = EsiAuthStore(
+                    credentials={},
+                    tokens={},
+                    oauth_metadata=OauthSettings(),
+                    user_agent=UserAgentSettings(),
+                )
+                auth_store.save_to_disk(file_path)
+                return auth_store
+
+        case _:
+            raise ValueError(f"Unknown connection type: {connection_type}")
+
+
 class EsiAuth:
-    def __init__(self, store_path: Path | None, auth_server_timeout: int = 300) -> None:
+    def __init__(self, connection_string: str, auth_server_timeout: int = 300) -> None:
         """Initialize the EsiAuth instance.
 
         Pass None to store_path to create a new in-memory store.
@@ -271,28 +439,39 @@ class EsiAuth:
             store_path: Path to the file where the store is saved. If None, an in-memory store is used.
             auth_server_timeout: Seconds to wait for a reply.
         """
-        self.store_path = store_path
-        if self.store_path is None:
-            store = EsiAuthStore(
-                credentials={},
-                tokens={},
-                oauth_metadata=OauthSettings(),
-                user_agent=UserAgentSettings(),
-            )
-            self.store = store
-        elif self.store_path.is_dir():
-            raise AuthStoreException(f"store_path {store_path} is a directory.")
-        elif not self.store_path.is_file():
-            store = EsiAuthStore(
-                credentials={},
-                tokens={},
-                oauth_metadata=OauthSettings(),
-                user_agent=UserAgentSettings(),
-            )
-            self.store = store
-            self._save_store()  # Create new store file
-        else:
-            self.store = EsiAuthStore.load_from_disk(self.store_path)
+        auth_store = connect_auth_store(connection_string)
+        self.store: EsiAuthStore = auth_store
+        ###############################################################################################
+        # Only needed until multiple store types are supported with AuthStoreProviderProtocol. ###########
+
+        if not ":" in connection_string:
+            raise ValueError("Invalid connection string format.")
+        split_uri = connection_string.split(":", 1)
+        if len(split_uri) != 2:
+            raise ValueError("Invalid connection string format.")
+        _, conn_str = split_uri
+        self.store_path = Path(conn_str)
+        # if self.store_path is None:
+        #     store = EsiAuthStore(
+        #         credentials={},
+        #         tokens={},
+        #         oauth_metadata=OauthSettings(),
+        #         user_agent=UserAgentSettings(),
+        #     )
+        #     self.store = store
+        # elif self.store_path.is_dir():
+        #     raise AuthStoreException(f"store_path {connection_string} is a directory.")
+        # elif not self.store_path.is_file():
+        #     store = EsiAuthStore(
+        #         credentials={},
+        #         tokens={},
+        #         oauth_metadata=OauthSettings(),
+        #         user_agent=UserAgentSettings(),
+        #     )
+        #     self.store = store
+        #     self._save_store()  # Create new store file
+        # else:
+        #     self.store = EsiAuthStore.load_from_disk(self.store_path)
         self._jwks_client: PyJWKClient | None = None
         self._server_timeout = auth_server_timeout
 
@@ -690,6 +869,7 @@ class EsiAuth:
             ) from e
 
     def _save_store(self) -> None:
+        # TODO refactor when multiple store types are supported
         # Save the current store to disk if a path is set
         if self.store_path is not None:
             self.store.save_to_disk(self.store_path)
@@ -699,18 +879,18 @@ class EsiAuth:
 
 
 class TokenManager:
-    def __init__(self, store_path: Path) -> None:
-        """Initialize the TokenManager with a store path.
+    def __init__(self, connection_string: str) -> None:
+        """Initialize the TokenManager with a connection string.
 
         Args:
-            store_path: Path to the file where the store is saved.
+            connection_string: Connection string for the token store.
 
         """
-        self.store_path = store_path
+        self.connection_string = connection_string
 
     def _load_esi_auth(self) -> EsiAuth:
         """Load the EsiAuth instance."""
-        esi_auth = EsiAuth(store_path=self.store_path)
+        esi_auth = EsiAuth(connection_string=self.connection_string)
         return esi_auth
 
     def get_character_tokens(

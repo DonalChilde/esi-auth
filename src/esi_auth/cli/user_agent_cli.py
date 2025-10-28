@@ -5,7 +5,7 @@ from typing import Annotated
 import typer
 from rich.console import Console
 
-from esi_auth.cli.cli_helpers import get_auth_store
+from esi_auth.cli.cli_helpers import esi_auth_getter
 
 app = typer.Typer(no_args_is_help=True)
 
@@ -29,7 +29,7 @@ def set_user_agent(
     """Set user-agent information for the application."""
     console = Console()
     console.rule("[bold blue]Set User Agent Fields[/bold blue]")
-    esi_auth = get_auth_store(ctx)
+    esi_auth = esi_auth_getter(ctx)
     esi_auth.update_user_agent(
         character_name=character_name,
         user_email=user_email,

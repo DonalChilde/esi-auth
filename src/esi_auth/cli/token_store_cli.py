@@ -13,7 +13,7 @@ from rich.text import Text
 from esi_auth.cli import STYLE_ERROR, STYLE_SUCCESS, STYLE_WARNING
 from esi_auth.esi_auth import CharacterToken, EsiAuth, EveCredentials
 
-from .cli_helpers import check_user_agent_setup, get_auth_store
+from .cli_helpers import check_user_agent_setup, esi_auth_getter
 
 MAX_BUFFER_MINUTES = 20
 MIN_BUFFER_MINUTES = 5
@@ -51,7 +51,7 @@ def add(
     console = Console()
     console.rule("[bold blue]Add Authorized Character[/bold blue]")
     check_user_agent_setup(ctx)
-    esi_auth = get_auth_store(ctx)
+    esi_auth = esi_auth_getter(ctx)
     # Checks for client_id/client_alias presence and mutual exclusivity
     credentials = get_credentials_from_store(
         esi_auth=esi_auth,
@@ -108,7 +108,7 @@ def remove(
     console = Console()
     console.rule("[bold blue]Remove Authorized Character[/bold blue]")
 
-    esi_auth = get_auth_store(ctx)
+    esi_auth = esi_auth_getter(ctx)
     # Checks for client_id/client_alias presence and mutual exclusivity
     credentials = get_credentials_from_store(
         esi_auth=esi_auth,
@@ -130,7 +130,7 @@ def remove(
     )
 
 
-@app.command()
+@app.command(name="list")
 def list_characters(
     ctx: typer.Context,
     client_id: Annotated[
@@ -162,7 +162,7 @@ def list_characters(
     console = Console()
     console.rule("[bold blue]List Authorized Characters[/bold blue]")
 
-    esi_auth = get_auth_store(ctx)
+    esi_auth = esi_auth_getter(ctx)
     # Checks for client_id/client_alias presence and mutual exclusivity
     credentials = get_credentials_from_store(
         esi_auth=esi_auth,
@@ -236,7 +236,7 @@ def refresh(
     if min_buffer_minutes > MAX_BUFFER_MINUTES:
         min_buffer_minutes = MAX_BUFFER_MINUTES
 
-    esi_auth = get_auth_store(ctx)
+    esi_auth = esi_auth_getter(ctx)
     # Checks for client_id/client_alias presence and mutual exclusivity
     credentials = get_credentials_from_store(
         esi_auth=esi_auth,

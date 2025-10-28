@@ -6,13 +6,12 @@ from copy import deepcopy
 from dataclasses import dataclass
 from importlib import metadata
 from pathlib import Path
-from typing import Any, List
+from typing import Any, Protocol
 from urllib.parse import urlparse
 
 import aiohttp
 from jwt import PyJWKClient
 from pydantic import BaseModel, Field, RootModel
-from typing_extensions import Protocol
 from whenever import Instant
 
 from esi_auth import auth_helpers as AH
@@ -436,7 +435,7 @@ class EsiAuth:
         Set store_path later to save/load from disk.
 
         Args:
-            store_path: Path to the file where the store is saved. If None, an in-memory store is used.
+            connection_string: The connection string for the auth store.
             auth_server_timeout: Seconds to wait for a reply.
         """
         auth_store = connect_auth_store(connection_string)

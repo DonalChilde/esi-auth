@@ -11,6 +11,7 @@ import typer
 from rich.console import Console
 from rich.text import Text
 
+from esi_auth import __app_name__, __version__
 from esi_auth.cli import STYLE_INFO
 from esi_auth.cli.cli_helpers import ensure_env_example, esi_auth_getter
 from esi_auth.esi_auth import AuthStoreException, EsiAuth, UserAgentSettings
@@ -33,12 +34,13 @@ app.add_typer(util_app, name="util", help="Utility commands.")
 
 @dataclass
 class CliConfig:
-    app_name: str = "NOT SET"
-    version: str = "NOT SET"
+    app_name: str = __app_name__
+    version: str = __version__
     start_time: int = perf_counter_ns()
     debug: bool = False
     verbosity: int = 1
     silent: bool = False
+    settings: EsiAuthSettings | None = None
     esi_auth: EsiAuth | None = None
 
     def __repr__(self) -> str:
@@ -51,6 +53,7 @@ class CliConfig:
             f"debug={self.debug!r}, "
             f"verbosity={self.verbosity!r}, "
             f"silent={self.silent!r}, "
+            f"settings={self.settings!r}, "
             f"esi_auth={self.esi_auth.store_path if self.esi_auth else None}"
             ")"
         )
@@ -64,7 +67,8 @@ class CliConfig:
             f" \tstart_time={self.start_time}\n"
             f" \tdebug={self.debug}\n"
             f" \tverbosity={self.verbosity}\n"
-            f" \tsilent={self.silent}"
+            f" \tsilent={self.silent}\n"
+            f" \tsettings={self.settings!r}\n"
             f" \tesi_auth={self.esi_auth.store_path if self.esi_auth else None}\n"
         )
 
@@ -126,10 +130,15 @@ def init_config(
 ) -> None:
     """Initialize configuration based on CLI options."""
     start = perf_counter_ns()
-
+    config = CliConfig(
+        start_time=start,
+        debug=debug,
+        verbosity=verbosity,
+        silent=silent,
+        settings=esi_auth_settings,
+    )
+    ctx.obj = config
     try:
-        # TODO refactor when multiple store types are supported.
-
         user_agent = UserAgentSettings(
             character_name=esi_auth_settings.character_name,
             user_email=esi_auth_settings.user_email,
@@ -141,22 +150,13 @@ def init_config(
             auth_server_timeout=esi_auth_settings.auth_server_timeout,
             user_agent_settings=user_agent,
         )
+        cli_config: CliConfig = ctx.obj
+        cli_config.esi_auth = esi_auth
 
     except AuthStoreException as e:
         console = Console()
         console.print(f"[bold red]Error initializing auth store: {e}")
         raise typer.Exit(code=1) from e
-
-    config = CliConfig(
-        app_name="Esi Auth",
-        version=metadata.version("esi-auth"),
-        start_time=start,
-        debug=debug,
-        verbosity=verbosity,
-        silent=silent,
-        esi_auth=esi_auth,
-    )
-    ctx.obj = config
 
 
 @app.command()
@@ -166,8 +166,8 @@ def version(ctx: typer.Context):
     console.rule(Text("esi-auth Version Information", style=STYLE_INFO))
     cli_config: CliConfig = ctx.obj
     console.print(f"{cli_config.app_name} version {cli_config.version}")
-    settings = get_settings()
-    console.print(settings)
+    console.print("Configuration:")
+    console.print(cli_config)
 
 
 @app.command()

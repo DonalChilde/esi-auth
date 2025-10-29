@@ -6,6 +6,9 @@ from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from esi_auth import APPLICATION_NAME, DEFAULT_APP_DIR, NAMESPACE
+from esi_auth.make_safe_env_name import make_safe_env_name
+
+_app_env_prefix = make_safe_env_name(f"{NAMESPACE}_{APPLICATION_NAME}_")
 
 
 class EsiAuthSettings(BaseSettings):
@@ -17,7 +20,7 @@ class EsiAuthSettings(BaseSettings):
     app_dir: Path = Field(
         default=DEFAULT_APP_DIR, description="Directory for application data."
     )
-    store_connection_string: str = Field(
+    connection_string: str = Field(
         default=f"esi-auth-file:{DEFAULT_APP_DIR.resolve()}/esi-auth-store.json",
         description="Connection string for a json based auth store.",
     )
@@ -43,7 +46,7 @@ class EsiAuthSettings(BaseSettings):
     )
 
     model_config = SettingsConfigDict(
-        env_prefix=f"{NAMESPACE.upper()}_{APPLICATION_NAME.upper().replace('-', '_')}_",
+        env_prefix=_app_env_prefix,
         env_file=(f"{DEFAULT_APP_DIR.resolve()}/.env", ".env"),
         env_file_encoding="utf-8",
     )

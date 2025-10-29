@@ -137,7 +137,7 @@ def init_config(
             user_app_version=esi_auth_settings.user_app_version,
         )
         esi_auth = EsiAuth(
-            connection_string=esi_auth_settings.store_connection_string,
+            connection_string=esi_auth_settings.connection_string,
             auth_server_timeout=esi_auth_settings.auth_server_timeout,
             user_agent_settings=user_agent,
         )

@@ -226,7 +226,7 @@ class EsiAuthStore(BaseModel):
     credentials: dict[str, EveCredentials]
     tokens: dict[str, dict[int, CharacterToken]]
     oauth_metadata: OauthSettings
-    user_agent: UserAgentSettings
+    # user_agent: UserAgentSettings
 
     def save_to_disk(self, file_path: Path | None) -> None:
         """Save the current store to disk atomically.
@@ -418,7 +418,7 @@ def connect_auth_store(connection_string: str) -> EsiAuthStore:
                     credentials={},
                     tokens={},
                     oauth_metadata=OauthSettings(),
-                    user_agent=UserAgentSettings(),
+                    # user_agent=UserAgentSettings(),
                 )
                 auth_store.save_to_disk(file_path)
                 return auth_store
@@ -428,7 +428,12 @@ def connect_auth_store(connection_string: str) -> EsiAuthStore:
 
 
 class EsiAuth:
-    def __init__(self, connection_string: str, auth_server_timeout: int = 300) -> None:
+    def __init__(
+        self,
+        connection_string: str,
+        user_agent_settings: UserAgentSettings,
+        auth_server_timeout: int = 300,
+    ) -> None:
         """Initialize the EsiAuth instance.
 
         Pass None to store_path to create a new in-memory store.
@@ -437,7 +442,9 @@ class EsiAuth:
         Args:
             connection_string: The connection string for the auth store.
             auth_server_timeout: Seconds to wait for a reply.
+            user_agent: Optional UserAgentSettings to override store values.
         """
+        self.user_agent_settings = user_agent_settings
         auth_store = connect_auth_store(connection_string)
         self.store: EsiAuthStore = auth_store
         ###############################################################################################
@@ -793,25 +800,25 @@ class EsiAuth:
     # Helper Methods
     ###############################################################################
 
-    def update_user_agent(
-        self,
-        character_name: str,
-        user_email: str,
-        user_app_name: str,
-        user_app_version: str,
-    ) -> None:
-        """Update the user agent settings."""
-        self.store.user_agent.character_name = character_name
-        self.store.user_agent.user_email = user_email
-        self.store.user_agent.user_app_name = user_app_name
-        self.store.user_agent.user_app_version = user_app_version
-        self._save_store()
+    # def update_user_agent(
+    #     self,
+    #     character_name: str,
+    #     user_email: str,
+    #     user_app_name: str,
+    #     user_app_version: str,
+    # ) -> None:
+    #     """Update the user agent settings."""
+    #     self.store.user_agent.character_name = character_name
+    #     self.store.user_agent.user_email = user_email
+    #     self.store.user_agent.user_app_name = user_app_name
+    #     self.store.user_agent.user_app_version = user_app_version
+    #     self._save_store()
 
     def user_agent(self) -> str:
         """Construct the User-Agent header string."""
         user_portion = (
-            f"{self.store.user_agent.user_app_name}/{self.store.user_agent.user_app_version} "
-            f"(eve:{self.store.user_agent.character_name}; {self.store.user_agent.user_email})"
+            f"{self.user_agent_settings.user_app_name}/{self.user_agent_settings.user_app_version} "
+            f"(eve:{self.user_agent_settings.character_name}; {self.user_agent_settings.user_email})"
         )
         app_metadata = metadata.metadata("esi-auth")
         app_name = app_metadata["name"]
@@ -878,18 +885,34 @@ class EsiAuth:
 
 
 class TokenManager:
-    def __init__(self, connection_string: str) -> None:
+    def __init__(
+        self, connection_string: str, user_agent: UserAgentSettings | None = None
+    ) -> None:
         """Initialize the TokenManager with a connection string.
 
         Args:
             connection_string: Connection string for the token store.
+            user_agent: Optional UserAgentSettings to override store values.
 
         """
         self.connection_string = connection_string
+        self.user_agent = (
+            user_agent
+            if user_agent is not None
+            else UserAgentSettings(
+                character_name="Unknown",
+                user_email="Unknown",
+                user_app_name="Unknown",
+                user_app_version="Unknown",
+            )
+        )
 
     def _load_esi_auth(self) -> EsiAuth:
         """Load the EsiAuth instance."""
-        esi_auth = EsiAuth(connection_string=self.connection_string)
+        esi_auth = EsiAuth(
+            connection_string=self.connection_string,
+            user_agent_settings=self.user_agent,
+        )
         return esi_auth
 
     def get_character_tokens(

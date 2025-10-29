@@ -1,11 +1,14 @@
 """Helper functions for CLI commands."""
 
+from pathlib import Path
+
 import typer
 from rich.console import Console
 from rich.text import Text
 
 from esi_auth.cli import STYLE_ERROR
 from esi_auth.esi_auth import EsiAuth
+from esi_auth.settings import env_example
 
 
 def check_user_agent_setup(ctx: typer.Context) -> None:
@@ -15,16 +18,13 @@ def check_user_agent_setup(ctx: typer.Context) -> None:
     user-agent information to be configured.
     """
     console = Console()
-    auth_store: EsiAuth = ctx.obj.auth_store  # type: ignore
-    if auth_store is None:  # pyright: ignore[reportUnnecessaryComparison]
-        console.print("[bold red]Auth store is not initialized.[/bold red]")
-        raise typer.Exit(code=1)
+    esi_auth = esi_auth_getter(ctx)
     if any(
         [
-            auth_store.store.user_agent.character_name == "Unknown",
-            auth_store.store.user_agent.user_email == "Unknown",
-            auth_store.store.user_agent.user_app_name == "Unknown",
-            auth_store.store.user_agent.user_app_version == "Unknown",
+            esi_auth.user_agent_settings.character_name == "Unknown",
+            esi_auth.user_agent_settings.user_email == "Unknown",
+            esi_auth.user_agent_settings.user_app_name == "Unknown",
+            esi_auth.user_agent_settings.user_app_version == "Unknown",
         ]
     ):
         console = Console()
@@ -36,7 +36,7 @@ def check_user_agent_setup(ctx: typer.Context) -> None:
         )
         console.print(f"[bold yellow]Before making network requests.")
         console.print(
-            "[bold yellow]Use the 'esi-auth user-agent set' command to configure these fields.[/bold yellow]"
+            "[bold yellow]Configure your User-Agent settings in the .env file.[/bold yellow]"
         )
         raise typer.Exit(code=1)
 
@@ -62,3 +62,21 @@ def esi_auth_getter(ctx: typer.Context) -> EsiAuth:
         )
         raise typer.Exit(code=1)
     return esi_auth
+
+
+def ensure_env_example(file_path: Path) -> bool:
+    """Ensure that a file exists at the file_path.
+
+    If no file exists, make an example .env file.
+
+    Args:
+        file_path: The path to the file to check or create.
+
+    Returns:
+        True if the file was created, False if it already existed.
+    """
+    if not file_path.exists():
+        file_path.parent.mkdir(parents=True, exist_ok=True)
+        file_path.write_text(env_example())
+        return False
+    return True

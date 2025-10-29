@@ -1,5 +1,6 @@
 """Command line interface for esi-auth."""
 
+import logging
 from dataclasses import dataclass
 from importlib import metadata
 from pathlib import Path
@@ -10,15 +11,17 @@ import typer
 from rich.console import Console
 from rich.text import Text
 
-from esi_auth import DEFAULT_APP_DIR
 from esi_auth.cli import STYLE_INFO
-from esi_auth.cli.cli_helpers import esi_auth_getter
-from esi_auth.esi_auth import AuthStoreException, EsiAuth
+from esi_auth.cli.cli_helpers import ensure_env_example, esi_auth_getter
+from esi_auth.esi_auth import AuthStoreException, EsiAuth, UserAgentSettings
+from esi_auth.logging_config import setup_logging
+from esi_auth.settings import EsiAuthSettings, get_settings
 
 from .credential_store_cli import app as credentials_app
 from .token_store_cli import app as token_store_app
-from .user_agent_cli import app as user_agent_app
 from .util_cli import app as util_app
+
+logger = logging.getLogger(__name__)
 
 app = typer.Typer(no_args_is_help=True)
 app.add_typer(
@@ -26,13 +29,6 @@ app.add_typer(
 )
 app.add_typer(token_store_app, name="tokens", help="Manage token storage.")
 app.add_typer(util_app, name="util", help="Utility commands.")
-app.add_typer(user_agent_app, name="user-agent", help="Manage User-Agent settings.")
-
-# TODO Load and use settings from a config file, environment variables, etc.
-# Allowing .env loading from working directory will allow third party tools to
-# set configuration without modifying global or user config files.
-
-# TODO init logging from this file.
 
 
 @dataclass
@@ -76,49 +72,42 @@ class CliConfig:
 @app.callback(invoke_without_command=True)
 def default_options(
     ctx: typer.Context,
-    store_file_path: Annotated[
-        Path,
-        typer.Option(
-            "--store-file-path",
-            "-f",
-            help="Path to the auth store file.",
-            exists=False,
-            file_okay=True,
-            dir_okay=False,
-            writable=True,
-            readable=True,
-            resolve_path=True,
-        ),
-    ] = DEFAULT_APP_DIR / "auth-store.json",
-    server_timeout: Annotated[
-        int,
-        typer.Option(
-            "--server-timeout",
-            "-t",
-            help="Timeout in seconds for the auth server to respond.",
-            min=1,
-            max=300,
-        ),
-    ] = 300,
-    debug: Annotated[bool, typer.Option("-d", help="Enable debug output.")] = False,
-    verbosity: Annotated[int, typer.Option("-v", help="Verbosity.", count=True)] = 1,
+    debug: Annotated[
+        bool, typer.Option("-d", help="Enable debug output.(not implemented)")
+    ] = False,
+    verbosity: Annotated[
+        int, typer.Option("-v", help="Verbosity. (not implemented)", count=True)
+    ] = 1,
     silent: Annotated[
         bool,
-        typer.Option(help="Enable silent mode. Only results and errors will be shown."),
+        typer.Option(
+            help="Enable silent mode. Only results and errors will be shown.(not implemented)"
+        ),
     ] = False,
 ):
     """Esi Auth Command Line Interface.
 
     Insert pithy saying here
     """
+    console = Console()
+    settings = get_settings()
+    setup_logging(log_dir=settings.log_dir)
+    env_file_exists = ensure_env_example(file_path=settings.app_dir / ".env")
+    if not env_file_exists:
+        console.print(
+            f"[bold yellow]An example .env file has been created at {settings.app_dir / '.env'}.[/bold yellow]"
+        )
+        console.print(
+            "[bold yellow]Please edit this file to configure your User-Agent settings before using esi-auth.[/bold yellow]"
+        )
+        raise typer.Exit(code=1)
     if any((debug, verbosity > 1, silent)):
         typer.echo("Debug, verbosity, and silent options are not yet implemented.")
         raise typer.Exit(code=1)
-    print(store_file_path)
+
     init_config(
         ctx,
-        store_file_path=store_file_path,
-        server_timeout=server_timeout,
+        esi_auth_settings=settings,
         debug=debug,
         verbosity=verbosity,
         silent=silent,
@@ -126,19 +115,11 @@ def default_options(
     console = Console()
     console.print("[bold]Welcome to esi-auth, a tool for managing EVE SSO tokens.")
 
-    if ctx.obj.verbosity > 1:
-        typer.echo("CLI configuration:")
-        # TODO rework this with rich.
-        # typer.echo(f"{indent_lines(str(ctx.obj), indent=2)}")
-        typer.echo("App configuration:")
-        # typer.echo(f"{indent_lines(str(CONFIG), indent=2)}")
-
 
 def init_config(
     ctx: typer.Context,
     *,
-    store_file_path: Path,
-    server_timeout: int = 300,
+    esi_auth_settings: EsiAuthSettings,
     debug: bool,
     verbosity: int,
     silent: bool,
@@ -147,12 +128,20 @@ def init_config(
     start = perf_counter_ns()
 
     try:
-        # Try to load the auth store. Creates a new store if missing.
         # TODO refactor when multiple store types are supported.
-        esi_auth = EsiAuth(
-            connection_string=f"esi-auth-file:{store_file_path.resolve()}",
-            auth_server_timeout=server_timeout,
+
+        user_agent = UserAgentSettings(
+            character_name=esi_auth_settings.character_name,
+            user_email=esi_auth_settings.user_email,
+            user_app_name=esi_auth_settings.user_app_name,
+            user_app_version=esi_auth_settings.user_app_version,
         )
+        esi_auth = EsiAuth(
+            connection_string=esi_auth_settings.store_connection_string,
+            auth_server_timeout=esi_auth_settings.auth_server_timeout,
+            user_agent_settings=user_agent,
+        )
+
     except AuthStoreException as e:
         console = Console()
         console.print(f"[bold red]Error initializing auth store: {e}")
@@ -175,9 +164,10 @@ def version(ctx: typer.Context):
     """Display version information."""
     console = Console()
     console.rule(Text("esi-auth Version Information", style=STYLE_INFO))
-    esi_auth = esi_auth_getter(ctx)
-    console.print(f"{ctx.obj.app_name} version {ctx.obj.version}")
-    console.print(f"Store File: {esi_auth.store_path}")
+    cli_config: CliConfig = ctx.obj
+    console.print(f"{cli_config.app_name} version {cli_config.version}")
+    settings = get_settings()
+    console.print(settings)
 
 
 @app.command()
@@ -200,6 +190,37 @@ def reset(ctx: typer.Context):
     if store_path is not None and store_path.is_file():  # type: ignore
         store_path.unlink(missing_ok=True)
     ctx.obj.esi_auth = EsiAuth(
-        connection_string=f"esi-auth-file:{store_path.resolve()}"
+        connection_string=f"esi-auth-file:{store_path.resolve()}",
+        user_agent_settings=UserAgentSettings(
+            character_name="Unknown",
+            user_email="Unknown",
+            user_app_name="Unknown",
+            user_app_version="Unknown",
+        ),
     )
     console.print("[bold green]Application reset complete.")
+
+
+@app.command()
+def example_env(
+    file_path: Annotated[
+        Path,
+        typer.Argument(
+            help="Path to create the example .env file.",
+        ),
+    ],
+):
+    """Create an example .env file for esi-auth configuration."""
+    console = Console()
+    exists = ensure_env_example(file_path=file_path)
+    if exists:
+        console.print(
+            f"[bold yellow]File already exists at {file_path}. No changes made.[/bold yellow]"
+        )
+    else:
+        console.print(
+            f"[bold green]Example .env file created at {file_path}.[/bold green]"
+        )
+        console.print(
+            "[bold green]Please edit this file to configure your User-Agent settings before using esi-auth.[/bold green]"
+        )

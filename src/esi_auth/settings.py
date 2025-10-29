@@ -78,21 +78,21 @@ def env_example() -> str:
 ##### Logging and Store Configuration #####
 
 # The logging directory is where log files will be stored.
-#{NAMESPACE.upper()}_{APPLICATION_NAME.upper().replace("-", "_")}_LOG_DIR="{(DEFAULT_APP_DIR / "logs").resolve()}"
+#{_app_env_prefix}LOG_DIR="{(DEFAULT_APP_DIR / "logs").resolve()}"
 
 # The App Directory is where application data is stored.
-#{NAMESPACE.upper()}_{APPLICATION_NAME.upper().replace("-", "_")}_APP_DIR="{DEFAULT_APP_DIR.resolve()}"
+#{_app_env_prefix}APP_DIR="{DEFAULT_APP_DIR.resolve()}"
 
 # Connection string for the auth store. This example uses a file-based store.
 # possible formats: 
 #  - "esi-auth-file:/path/to/store.json"
 #  - "esi-auth-sqlite:/path/to/store.db" (for future use)
-#{NAMESPACE.upper()}_{APPLICATION_NAME.upper().replace("-", "_")}_STORE_CONNECTION_STRING="esi-auth-file:{(DEFAULT_APP_DIR / "esi-auth-store.json").resolve()}"
+#{_app_env_prefix}STORE_CONNECTION_STRING="esi-auth-file:{(DEFAULT_APP_DIR / "esi-auth-store.json").resolve()}"
 
 ##### Auth Server Timeout #####
 
 # Timeout in seconds for the auth server to respond. Default is 300 seconds (5 minutes).
-#{NAMESPACE.upper()}_{APPLICATION_NAME.upper().replace("-", "_")}_AUTH_SERVER_TIMEOUT="300"
+#{_app_env_prefix}AUTH_SERVER_TIMEOUT="300"
 
 ##### User-Agent Information #####
 
@@ -101,15 +101,15 @@ def env_example() -> str:
 # They must be set before making any network requests.
 
 # The name of the EVE Online character of the developer of the app that is using ESI Auth.
-{NAMESPACE.upper()}_{APPLICATION_NAME.upper().replace("-", "_")}_CHARACTER_NAME="UNKNOWN"
+{_app_env_prefix}CHARACTER_NAME="UNKNOWN"
 
 # The email of the developer of the app that is using ESI Auth.
-{NAMESPACE.upper()}_{APPLICATION_NAME.upper().replace("-", "_")}_USER_EMAIL="UNKNOWN"
+{_app_env_prefix}USER_EMAIL="UNKNOWN"
 
 # The name of the application using ESI Auth.
-{NAMESPACE.upper()}_{APPLICATION_NAME.upper().replace("-", "_")}_USER_APP_NAME="UNKNOWN"
+{_app_env_prefix}USER_APP_NAME="UNKNOWN"
 
 # The version of the application using ESI Auth.
-{NAMESPACE.upper()}_{APPLICATION_NAME.upper().replace("-", "_")}_USER_APP_VERSION="UNKNOWN"
+{_app_env_prefix}USER_APP_VERSION="UNKNOWN"
 """
     return env_example_str

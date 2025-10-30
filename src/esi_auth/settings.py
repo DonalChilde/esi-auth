@@ -5,10 +5,9 @@ from pathlib import Path
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-from esi_auth import APPLICATION_NAME, DEFAULT_APP_DIR, NAMESPACE
-from esi_auth.make_safe_env_name import make_safe_env_name
+from esi_auth import DEFAULT_APP_DIR
 
-_app_env_prefix = make_safe_env_name(f"{NAMESPACE}_{APPLICATION_NAME}_")
+_app_env_prefix = "PFMSOFT_ESI_AUTH_"
 
 
 class EsiAuthSettings(BaseSettings):

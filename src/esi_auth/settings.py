@@ -47,7 +47,7 @@ class EsiAuthSettings(BaseSettings):
 
     model_config = SettingsConfigDict(
         env_prefix=_app_env_prefix,
-        env_file=(f"{DEFAULT_APP_DIR.resolve()}/.env", ".env"),
+        env_file=(f"{DEFAULT_APP_DIR.resolve()}/.esi-auth.env", ".esi-auth.env"),
         env_file_encoding="utf-8",
     )
 
@@ -62,12 +62,12 @@ def get_settings() -> EsiAuthSettings:
 
 
 def env_example() -> str:
-    """Provide an example of the .env file configuration for user-agent settings.
+    """Provide an example of the .esi-auth.env file configuration for user-agent settings.
 
     Returns:
-        A string containing the example .env configuration.
+        A string containing the example .esi-auth.env configuration.
     """
-    env_example_str = f"""# ESI Auth .env Configuration Example
+    env_example_str = f"""# ESI Auth .esi-auth.env Configuration Example
 # Uncomment lines to use them.
 # Replace the placeholder values with your actual information.
 

@@ -96,10 +96,10 @@ def default_options(
     console = Console()
     settings = get_settings()
     setup_logging(log_dir=settings.log_dir)
-    env_file_exists = ensure_env_example(file_path=settings.app_dir / ".env")
+    env_file_exists = ensure_env_example(file_path=settings.app_dir / ".esi-auth.env")
     if not env_file_exists:
         console.print(
-            f"[bold yellow]An example .env file has been created at {settings.app_dir / '.env'}.[/bold yellow]"
+            f"[bold yellow]An example .esi-auth.env file has been created at {settings.app_dir / '.esi-auth.env'}.[/bold yellow]"
         )
         console.print(
             "[bold yellow]Please edit this file to configure your User-Agent settings before using esi-auth.[/bold yellow]"
@@ -206,11 +206,11 @@ def example_env(
     file_path: Annotated[
         Path,
         typer.Argument(
-            help="Path to create the example .env file.",
+            help="Path to create the example .esi-auth.env file.",
         ),
     ],
 ):
-    """Create an example .env file for esi-auth configuration."""
+    """Create an example .esi-auth.env file for esi-auth configuration."""
     console = Console()
     exists = ensure_env_example(file_path=file_path)
     if exists:

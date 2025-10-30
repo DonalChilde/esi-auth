@@ -88,7 +88,7 @@ def env_example() -> str:
 # possible formats: 
 #  - "esi-auth-file:/path/to/store.json"
 #  - "esi-auth-sqlite:/path/to/store.db" (for future use)
-#{_app_env_prefix}STORE_CONNECTION_STRING="esi-auth-file:${{{_app_env_prefix}APP_DIR}}/esi-auth-store.json"
+#{_app_env_prefix}CONNECTION_STRING="esi-auth-file:${{{_app_env_prefix}APP_DIR}}/esi-auth-store.json"
 
 ##### Auth Server Timeout #####
 

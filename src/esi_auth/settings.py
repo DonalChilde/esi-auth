@@ -74,19 +74,21 @@ def env_example() -> str:
 # current working directory. If found in both places, settings from the current working
 # directory take precedence.
 
+# The App Directory is where application data is stored.
+#{_app_env_prefix}APP_DIR="{DEFAULT_APP_DIR.resolve()}"
+
 ##### Logging and Store Configuration #####
 
 # The logging directory is where log files will be stored.
-#{_app_env_prefix}LOG_DIR="{(DEFAULT_APP_DIR / "logs").resolve()}"
+#{_app_env_prefix}LOG_DIR="${{{_app_env_prefix}APP_DIR}}/logs"
 
-# The App Directory is where application data is stored.
-#{_app_env_prefix}APP_DIR="{DEFAULT_APP_DIR.resolve()}"
+
 
 # Connection string for the auth store. This example uses a file-based store.
 # possible formats: 
 #  - "esi-auth-file:/path/to/store.json"
 #  - "esi-auth-sqlite:/path/to/store.db" (for future use)
-#{_app_env_prefix}STORE_CONNECTION_STRING="esi-auth-file:{(DEFAULT_APP_DIR / "esi-auth-store.json").resolve()}"
+#{_app_env_prefix}STORE_CONNECTION_STRING="esi-auth-file:${{{_app_env_prefix}APP_DIR}}/esi-auth-store.json"
 
 ##### Auth Server Timeout #####
 

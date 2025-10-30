@@ -2,7 +2,6 @@
 
 import logging
 from dataclasses import dataclass
-from importlib import metadata
 from pathlib import Path
 from time import perf_counter_ns
 from typing import Annotated

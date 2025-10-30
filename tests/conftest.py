@@ -1,3 +1,5 @@
+"""Configuration for pytest testing environment."""
+
 import logging
 
 import pytest

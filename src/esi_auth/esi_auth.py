@@ -442,7 +442,7 @@ class EsiAuth:
         Args:
             connection_string: The connection string for the auth store.
             auth_server_timeout: Seconds to wait for a reply.
-            user_agent: Optional UserAgentSettings to override store values.
+            user_agent_settings: Settings for the User-Agent header.
         """
         self.user_agent_settings = user_agent_settings
         auth_store = connect_auth_store(connection_string)

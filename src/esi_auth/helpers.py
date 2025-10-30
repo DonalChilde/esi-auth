@@ -1,3 +1,5 @@
+"""Helper functions for esi-auth package."""
+
 from importlib import metadata
 
 

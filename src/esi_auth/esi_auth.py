@@ -238,6 +238,7 @@ class EsiAuthStore(BaseModel):
             raise ValueError("file_path must be set before saving to disk.")
         try:
             temp_file = file_path.with_suffix(".tmp")
+            temp_file.parent.mkdir(parents=True, exist_ok=True)
             with temp_file.open("w", encoding="utf-8") as f:
                 f.write(self.model_dump_json(indent=2))
             temp_file.replace(file_path)

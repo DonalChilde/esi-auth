@@ -13,7 +13,7 @@ from rich.text import Text
 from esi_auth import __app_name__, __version__
 from esi_auth.cli import STYLE_INFO
 from esi_auth.cli.cli_helpers import ensure_env_example, esi_auth_getter
-from esi_auth.esi_auth import AuthStoreException, EsiAuth, UserAgentSettings
+from esi_auth.esi_auth import AuthStoreException, EsiAuth
 from esi_auth.logging_config import setup_logging
 from esi_auth.settings import EsiAuthSettings, get_settings
 
@@ -100,9 +100,6 @@ def default_options(
         console.print(
             f"[bold yellow]An example .esi-auth.env file has been created at {settings.app_dir / '.esi-auth.env'}.[/bold yellow]"
         )
-        console.print(
-            "[bold yellow]Please edit this file to configure your User-Agent settings before using esi-auth.[/bold yellow]"
-        )
         raise typer.Exit(code=1)
     if any((debug, verbosity > 1, silent)):
         typer.echo("Debug, verbosity, and silent options are not yet implemented.")
@@ -138,16 +135,9 @@ def init_config(
     )
     ctx.obj = config
     try:
-        user_agent = UserAgentSettings(
-            character_name=esi_auth_settings.character_name,
-            user_email=esi_auth_settings.user_email,
-            user_app_name=esi_auth_settings.user_app_name,
-            user_app_version=esi_auth_settings.user_app_version,
-        )
         esi_auth = EsiAuth(
             connection_string=esi_auth_settings.connection_string,
             auth_server_timeout=esi_auth_settings.auth_server_timeout,
-            user_agent_settings=user_agent,
         )
         cli_config: CliConfig = ctx.obj
         cli_config.esi_auth = esi_auth
@@ -173,6 +163,7 @@ def version(ctx: typer.Context):
 def reset(ctx: typer.Context):
     """Reset the application by deleting all stored data."""
     # TODO refactor this when multiple store types are supported.
+    # FIXME: do not require store to load just to get path. Use settings connection string?
     console = Console()
     esi_auth = esi_auth_getter(ctx)
     store_path = esi_auth.store_path
@@ -190,12 +181,6 @@ def reset(ctx: typer.Context):
         store_path.unlink(missing_ok=True)
     ctx.obj.esi_auth = EsiAuth(
         connection_string=f"esi-auth-file:{store_path.resolve()}",
-        user_agent_settings=UserAgentSettings(
-            character_name="Unknown",
-            user_email="Unknown",
-            user_app_name="Unknown",
-            user_app_version="Unknown",
-        ),
     )
     console.print("[bold green]Application reset complete.")
 

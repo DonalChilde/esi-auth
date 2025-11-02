@@ -13,7 +13,7 @@ from rich.text import Text
 from esi_auth.cli import STYLE_ERROR, STYLE_SUCCESS, STYLE_WARNING
 from esi_auth.esi_auth import CharacterToken, EsiAuth, EveCredentials
 
-from .cli_helpers import check_user_agent_setup, esi_auth_getter
+from .cli_helpers import esi_auth_getter
 
 MAX_BUFFER_MINUTES = 20
 MIN_BUFFER_MINUTES = 5
@@ -50,7 +50,6 @@ def add(
     """Add an authorized character to the token store."""
     console = Console()
     console.rule("[bold blue]Add Authorized Character[/bold blue]")
-    check_user_agent_setup(ctx)
     esi_auth = esi_auth_getter(ctx)
     # Checks for client_id/client_alias presence and mutual exclusivity
     credentials = get_credentials_from_store(
@@ -227,7 +226,6 @@ def refresh(
     """
     console = Console()
     console.rule("[bold blue]Refresh Character Tokens[/bold blue]")
-    check_user_agent_setup(ctx)
     if min_buffer_minutes < 0:
         console.print(
             "[bold red]Error: min_buffer_minutes must be non-negative.[/bold red]"

@@ -2,21 +2,20 @@
 
 from importlib import metadata
 
-
-def get_user_agent(
-    character_name: str, user_email: str, user_app_name: str, user_app_version: str
-) -> str:
-    """Construct the User-Agent string for HTTP requests."""
-    user_portion = (
-        f"{user_app_name}/{user_app_version} (eve:{character_name}; {user_email})"
-    )
-    app_metadata = metadata.metadata("esi-auth")
-    app_name = app_metadata["name"]
-    app_version = app_metadata["version"]
-    app_source_url = get_package_url("esi-auth", "Source")
-    _, author_email = get_author_email("esi-auth")
-    esi_auth_portion = f"{app_name}/{app_version} ({author_email}; +{app_source_url})"
-    return f"{user_portion} {esi_auth_portion}"
+# def get_user_agent(
+#     character_name: str, user_email: str, user_app_name: str, user_app_version: str
+# ) -> str:
+#     """Construct the User-Agent string for HTTP requests."""
+#     user_portion = (
+#         f"{user_app_name}/{user_app_version} (eve:{character_name}; {user_email})"
+#     )
+#     app_metadata = metadata.metadata("esi-auth")
+#     app_name = app_metadata["name"]
+#     app_version = app_metadata["version"]
+#     app_source_url = get_package_url("esi-auth", "Source")
+#     _, author_email = get_author_email("esi-auth")
+#     esi_auth_portion = f"{app_name}/{app_version} ({author_email}; +{app_source_url})"
+#     return f"{user_portion} {esi_auth_portion}"
 
 
 def get_package_url(package_name: str, url_name: str) -> str:

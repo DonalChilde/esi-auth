@@ -4,7 +4,6 @@ import asyncio
 import logging
 from copy import deepcopy
 from dataclasses import dataclass
-from importlib import metadata
 from pathlib import Path
 from typing import Any, Protocol
 from urllib.parse import urlparse
@@ -15,7 +14,7 @@ from pydantic import BaseModel, Field, RootModel
 from whenever import Instant
 
 from esi_auth import auth_helpers as AH
-from esi_auth.helpers import get_author_email, get_package_url
+from esi_auth.settings import USER_AGENT
 
 OAUTH_METADATA_URL = (
     "https://login.eveonline.com/.well-known/oauth-authorization-server"
@@ -206,20 +205,20 @@ class OauthSettings(BaseModel):
     )
 
 
-class UserAgentSettings(BaseModel):
-    character_name: str = Field(
-        default="Unknown", description="Character name for User-Agent header"
-    )
+# class UserAgentSettings(BaseModel):
+#     character_name: str = Field(
+#         default="Unknown", description="Character name for User-Agent header"
+#     )
 
-    user_email: str = Field(
-        default="Unknown", description="User email for User-Agent header"
-    )
-    user_app_name: str = Field(
-        default="Unknown", description="App name for User-Agent header"
-    )
-    user_app_version: str = Field(
-        default="Unknown", description="App version for User-Agent header"
-    )
+#     user_email: str = Field(
+#         default="Unknown", description="User email for User-Agent header"
+#     )
+#     user_app_name: str = Field(
+#         default="Unknown", description="App name for User-Agent header"
+#     )
+#     user_app_version: str = Field(
+#         default="Unknown", description="App version for User-Agent header"
+#     )
 
 
 class EsiAuthStore(BaseModel):
@@ -354,20 +353,6 @@ class EsiAuthStoreProviderProtocol(Protocol):
         """
         ...
 
-    def get_user_agent(self) -> UserAgentSettings:
-        """Get the User-Agent string for requests."""
-        ...
-
-    def update_user_agent(
-        self,
-        character_name: str,
-        user_email: str,
-        user_app_name: str,
-        user_app_version: str,
-    ) -> None:
-        """Update the user agent settings."""
-        ...
-
     def get_oauth_settings(self) -> OauthSettings:
         """Get the OAuth settings."""
         ...
@@ -431,7 +416,7 @@ class EsiAuth:
     def __init__(
         self,
         connection_string: str,
-        user_agent_settings: UserAgentSettings,
+        user_agent_prefix: str = "",
         auth_server_timeout: int = 300,
     ) -> None:
         """Initialize the EsiAuth instance.
@@ -444,7 +429,7 @@ class EsiAuth:
             auth_server_timeout: Seconds to wait for a reply.
             user_agent_settings: Settings for the User-Agent header.
         """
-        self.user_agent_settings = user_agent_settings
+        self.user_agent_prefix = user_agent_prefix
         auth_store = connect_auth_store(connection_string)
         self.store: EsiAuthStore = auth_store
         ###############################################################################################
@@ -816,19 +801,8 @@ class EsiAuth:
 
     def user_agent(self) -> str:
         """Construct the User-Agent header string."""
-        user_portion = (
-            f"{self.user_agent_settings.user_app_name}/{self.user_agent_settings.user_app_version} "
-            f"(eve:{self.user_agent_settings.character_name}; {self.user_agent_settings.user_email})"
-        )
-        app_metadata = metadata.metadata("esi-auth")
-        app_name = app_metadata["name"]
-        app_version = app_metadata["version"]
-        app_source_url = get_package_url("esi-auth", "Source")
-        _, author_email = get_author_email("esi-auth")
-        esi_auth_portion = (
-            f"{app_name}/{app_version} ({author_email}; +{app_source_url})"
-        )
-        return f"{user_portion} {esi_auth_portion}"
+        combined = f"{self.user_agent_prefix}{'; ' if self.user_agent_prefix else ''}{USER_AGENT}"
+        return combined
 
     def is_credentials_in_store(self, credentials: EveCredentials) -> bool:
         """Check if credentials are in the store."""
@@ -885,33 +859,36 @@ class EsiAuth:
 
 
 class TokenManager:
-    def __init__(
-        self, connection_string: str, user_agent: UserAgentSettings | None = None
-    ) -> None:
+    """Limited manager for handling character tokens via the ESI Auth library.
+
+    Third party API users should use TokenManager to retrieve tokens, and the esi-auth
+    library internals should be hidden from them. Use the esi-auth cli for managing
+    credentials and tokens.
+
+
+    DevNote: This class is limited for now, and will be expanded later as needed.
+    Loading the EsiAuth instance each time is not optimal, but is acceptable for now.
+    A different connection storage method can be used later when the sqlite store is implemented.
+    """
+
+    # TODO: see dev note above
+
+    def __init__(self, connection_string: str, user_agent_prefix: str) -> None:
         """Initialize the TokenManager with a connection string.
 
         Args:
             connection_string: Connection string for the token store.
-            user_agent: Optional UserAgentSettings to override store values.
+            user_agent_prefix: Prefix for the User-Agent header.
 
         """
         self.connection_string = connection_string
-        self.user_agent = (
-            user_agent
-            if user_agent is not None
-            else UserAgentSettings(
-                character_name="Unknown",
-                user_email="Unknown",
-                user_app_name="Unknown",
-                user_app_version="Unknown",
-            )
-        )
+        self.user_agent_prefix = user_agent_prefix
 
     def _load_esi_auth(self) -> EsiAuth:
         """Load the EsiAuth instance."""
         esi_auth = EsiAuth(
             connection_string=self.connection_string,
-            user_agent_settings=self.user_agent,
+            user_agent_prefix=self.user_agent_prefix,
         )
         return esi_auth
 

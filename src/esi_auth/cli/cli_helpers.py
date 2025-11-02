@@ -10,35 +10,34 @@ from esi_auth.cli import STYLE_ERROR
 from esi_auth.esi_auth import EsiAuth
 from esi_auth.settings import env_example
 
+# def check_user_agent_setup(ctx: typer.Context) -> None:
+#     """Check that the application is properly set up.
 
-def check_user_agent_setup(ctx: typer.Context) -> None:
-    """Check that the application is properly set up.
-
-    This function is called before executing commands that require
-    user-agent information to be configured.
-    """
-    console = Console()
-    esi_auth = esi_auth_getter(ctx)
-    if any(
-        [
-            esi_auth.user_agent_settings.character_name == "Unknown",
-            esi_auth.user_agent_settings.user_email == "Unknown",
-            esi_auth.user_agent_settings.user_app_name == "Unknown",
-            esi_auth.user_agent_settings.user_app_version == "Unknown",
-        ]
-    ):
-        console = Console()
-        console.print(
-            "[bold yellow]Warning: User-Agent information is not fully configured."
-        )
-        console.print(
-            "[bold yellow]You must set character name, user email, your app name, and your app version."
-        )
-        console.print(f"[bold yellow]Before making network requests.")
-        console.print(
-            "[bold yellow]Configure your User-Agent settings in the .env file.[/bold yellow]"
-        )
-        raise typer.Exit(code=1)
+#     This function is called before executing commands that require
+#     user-agent information to be configured.
+#     """
+#     console = Console()
+#     esi_auth = esi_auth_getter(ctx)
+#     if any(
+#         [
+#             esi_auth.user_agent_settings.character_name == "Unknown",
+#             esi_auth.user_agent_settings.user_email == "Unknown",
+#             esi_auth.user_agent_settings.user_app_name == "Unknown",
+#             esi_auth.user_agent_settings.user_app_version == "Unknown",
+#         ]
+#     ):
+#         console = Console()
+#         console.print(
+#             "[bold yellow]Warning: User-Agent information is not fully configured."
+#         )
+#         console.print(
+#             "[bold yellow]You must set character name, user email, your app name, and your app version."
+#         )
+#         console.print(f"[bold yellow]Before making network requests.")
+#         console.print(
+#             "[bold yellow]Configure your User-Agent settings in the .env file.[/bold yellow]"
+#         )
+#         raise typer.Exit(code=1)
 
 
 def esi_auth_getter(ctx: typer.Context) -> EsiAuth:

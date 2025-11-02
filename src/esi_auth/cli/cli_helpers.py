@@ -63,19 +63,20 @@ def esi_auth_getter(ctx: typer.Context) -> EsiAuth:
     return esi_auth
 
 
-def ensure_env_example(file_path: Path) -> bool:
+def ensure_env_example(file_path: Path, app_path: Path | None = None) -> bool:
     """Ensure that a file exists at the file_path.
 
     If no file exists, make an example .env file.
 
     Args:
         file_path: The path to the file to check or create.
+        app_path: Optional application directory path for the env example.
 
     Returns:
         True if the file was created, False if it already existed.
     """
     if not file_path.exists():
         file_path.parent.mkdir(parents=True, exist_ok=True)
-        file_path.write_text(env_example())
+        file_path.write_text(env_example(app_path))
         return False
     return True

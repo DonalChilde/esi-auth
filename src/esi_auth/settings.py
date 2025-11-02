@@ -52,8 +52,14 @@ def get_settings() -> EsiAuthSettings:
     return EsiAuthSettings()
 
 
-def env_example() -> str:
+def env_example(app_dir: Path | None = None) -> str:
     """Provide an example of the .esi-auth.env file configuration for user-agent settings.
+
+    Supply the application directory if it is not the default. if the app_dir is supplied,
+    the APP_DIR and LOG_DIR, and CONNECTION_STRING lines will be uncommented.
+
+    Args:
+        app_dir: Optional Path to the application directory. If None, default is used.
 
     Returns:
         A string containing the example .esi-auth.env configuration.
@@ -71,12 +77,12 @@ def env_example() -> str:
 # directory take precedence.
 
 # The App Directory is where application data is stored.
-#{_app_env_prefix}APP_DIR="{DEFAULT_APP_DIR.resolve()}"
+{"" if app_dir else "#"}{_app_env_prefix}APP_DIR="{app_dir.resolve() if app_dir else DEFAULT_APP_DIR.resolve()}"
 
 ##### Logging and Store Configuration #####
 
 # The logging directory is where log files will be stored.
-#{_app_env_prefix}LOG_DIR="${{{_app_env_prefix}APP_DIR}}/logs"
+{"" if app_dir else "#"}{_app_env_prefix}LOG_DIR="${{{_app_env_prefix}APP_DIR}}/logs"
 
 
 
@@ -84,7 +90,7 @@ def env_example() -> str:
 # possible formats: 
 #  - "esi-auth-file:/path/to/store.json"
 #  - "esi-auth-sqlite:/path/to/store.db" (for future use)
-#{_app_env_prefix}CONNECTION_STRING="esi-auth-file:${{{_app_env_prefix}APP_DIR}}/esi-auth-store.json"
+{"" if app_dir else "#"}{_app_env_prefix}CONNECTION_STRING="esi-auth-file:${{{_app_env_prefix}APP_DIR}}/esi-auth-store.json"
 
 ##### Auth Server Timeout #####
 

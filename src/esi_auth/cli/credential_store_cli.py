@@ -86,7 +86,7 @@ def add_credentials(
                 f"[green]Successfully added credentials for {credentials.name}[/green]"
             )
     except Exception as e:
-        console.print(f"[bold red]Error adding credentials: {e}[/red]")
+        console.print(f"[bold red]Error adding credentials: {e}[/bold red]")
 
 
 @app.command("remove", help="Remove application credentials by client ID.")

@@ -3,19 +3,22 @@
 import logging
 from dataclasses import dataclass
 from pathlib import Path
-from time import perf_counter_ns
 from typing import Annotated
 
 import typer
 from rich.console import Console
 from rich.text import Text
+from whenever import Instant
 
 from esi_auth import __app_name__, __version__
 from esi_auth.cli import STYLE_INFO
-from esi_auth.cli.cli_helpers import ensure_env_example, esi_auth_getter
-from esi_auth.esi_auth import AuthStoreException, EsiAuth
+from esi_auth.cli.cli_helpers import (
+    ensure_env_example,
+    esi_auth_factory,
+)
+from esi_auth.esi_auth import EsiAuth
 from esi_auth.logging_config import setup_logging
-from esi_auth.settings import EsiAuthSettings, get_settings
+from esi_auth.settings import get_settings
 
 from .credential_store_cli import app as credentials_app
 from .token_store_cli import app as token_store_app
@@ -35,12 +38,12 @@ app.add_typer(util_app, name="util", help="Utility commands.")
 class CliConfig:
     app_name: str = __app_name__
     version: str = __version__
-    start_time: int = perf_counter_ns()
+    start_time: Instant = Instant.now()
     debug: bool = False
     verbosity: int = 1
     silent: bool = False
-    settings: EsiAuthSettings | None = None
-    esi_auth: EsiAuth | None = None
+    # settings: EsiAuthSettings | None = None
+    # esi_auth: EsiAuth | None = None
 
     def __repr__(self) -> str:
         """Return a string representation of the CLI configuration."""
@@ -52,8 +55,6 @@ class CliConfig:
             f"debug={self.debug!r}, "
             f"verbosity={self.verbosity!r}, "
             f"silent={self.silent!r}, "
-            f"settings={self.settings!r}, "
-            f"esi_auth={self.esi_auth.store_path if self.esi_auth else None}"
             ")"
         )
 
@@ -67,8 +68,6 @@ class CliConfig:
             f" \tdebug={self.debug}\n"
             f" \tverbosity={self.verbosity}\n"
             f" \tsilent={self.silent}\n"
-            f" \tsettings={self.settings!r}\n"
-            f" \tesi_auth={self.esi_auth.store_path if self.esi_auth else None}\n"
         )
 
 
@@ -107,7 +106,6 @@ def default_options(
 
     init_config(
         ctx,
-        esi_auth_settings=settings,
         debug=debug,
         verbosity=verbosity,
         silent=silent,
@@ -119,33 +117,17 @@ def default_options(
 def init_config(
     ctx: typer.Context,
     *,
-    esi_auth_settings: EsiAuthSettings,
     debug: bool,
     verbosity: int,
     silent: bool,
 ) -> None:
     """Initialize configuration based on CLI options."""
-    start = perf_counter_ns()
     config = CliConfig(
-        start_time=start,
         debug=debug,
         verbosity=verbosity,
         silent=silent,
-        settings=esi_auth_settings,
     )
     ctx.obj = config
-    try:
-        esi_auth = EsiAuth(
-            connection_string=esi_auth_settings.connection_string,
-            auth_server_timeout=esi_auth_settings.auth_server_timeout,
-        )
-        cli_config: CliConfig = ctx.obj
-        cli_config.esi_auth = esi_auth
-
-    except AuthStoreException as e:
-        console = Console()
-        console.print(f"[bold red]Error initializing auth store: {e}")
-        raise typer.Exit(code=1) from e
 
 
 @app.command()
@@ -155,8 +137,12 @@ def version(ctx: typer.Context):
     console.rule(Text("esi-auth Version Information", style=STYLE_INFO))
     cli_config: CliConfig = ctx.obj
     console.print(f"{cli_config.app_name} version {cli_config.version}")
-    console.print("Configuration:")
+    console.print("Cli Configuration:")
     console.print(cli_config)
+    console.print()
+    console.print(f"esi-auth Settings:")
+    settings = get_settings()
+    console.print(settings)
 
 
 @app.command()
@@ -165,7 +151,8 @@ def reset(ctx: typer.Context):
     # TODO refactor this when multiple store types are supported.
     # FIXME: do not require store to load just to get path. Use settings connection string?
     console = Console()
-    esi_auth = esi_auth_getter(ctx)
+    settings = get_settings()
+    esi_auth = esi_auth_factory(settings)
     store_path = esi_auth.store_path
     console.print("[bold yellow]Resetting application...")
     console.print(

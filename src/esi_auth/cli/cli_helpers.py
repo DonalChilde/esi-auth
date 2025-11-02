@@ -7,11 +7,12 @@ from rich.console import Console
 from rich.text import Text
 
 from esi_auth.cli import STYLE_ERROR
-from esi_auth.esi_auth import EsiAuth
-from esi_auth.settings import env_example
+from esi_auth.esi_auth import AuthStoreException, EsiAuth
+from esi_auth.settings import EsiAuthSettings, env_example
 
 # def check_user_agent_setup(ctx: typer.Context) -> None:
 #     """Check that the application is properly set up.
+
 
 #     This function is called before executing commands that require
 #     user-agent information to be configured.
@@ -38,29 +39,51 @@ from esi_auth.settings import env_example
 #             "[bold yellow]Configure your User-Agent settings in the .env file.[/bold yellow]"
 #         )
 #         raise typer.Exit(code=1)
-
-
-def esi_auth_getter(ctx: typer.Context) -> EsiAuth:
-    """Retrieve the EsiAuth instance from the CLI context.
+def esi_auth_factory(settings: EsiAuthSettings) -> EsiAuth:
+    """Create an EsiAuth instance using the provided settings.
 
     Args:
-        ctx: The Typer context containing the EsiAuth instance.
+        settings: The settings to use for creating the EsiAuth instance.
 
     Returns:
-        The EsiAuth instance.
-
-    Raises:
-        typer.Exit: If the EsiAuth instance is not initialized.
+        An initialized EsiAuth instance.
     """
-    esi_auth: EsiAuth = ctx.obj.esi_auth
-    if esi_auth is None:  # pyright: ignore[reportUnnecessaryComparison]
+    try:
+        esi_auth = EsiAuth(
+            connection_string=settings.connection_string,
+            auth_server_timeout=settings.auth_server_timeout,
+        )
+    except AuthStoreException as e:
         console = Console()
         console.print(
-            Text("[bold red]Auth store is not initialized.[/bold red]"),
+            Text(f"[bold red]Error initializing EsiAuth: {e}[/bold red]"),
             style=STYLE_ERROR,
         )
-        raise typer.Exit(code=1)
+        raise typer.Exit(code=1) from e
     return esi_auth
+
+
+# def esi_auth_getter(ctx: typer.Context) -> EsiAuth:
+#     """Retrieve the EsiAuth instance from the CLI context.
+
+#     Args:
+#         ctx: The Typer context containing the EsiAuth instance.
+
+#     Returns:
+#         The EsiAuth instance.
+
+#     Raises:
+#         typer.Exit: If the EsiAuth instance is not initialized.
+#     """
+#     esi_auth: EsiAuth = ctx.obj.esi_auth
+#     if esi_auth is None:  # pyright: ignore[reportUnnecessaryComparison]
+#         console = Console()
+#         console.print(
+#             Text("[bold red]Auth store is not initialized.[/bold red]"),
+#             style=STYLE_ERROR,
+#         )
+#         raise typer.Exit(code=1)
+#     return esi_auth
 
 
 def ensure_env_example(file_path: Path, app_path: Path | None = None) -> bool:

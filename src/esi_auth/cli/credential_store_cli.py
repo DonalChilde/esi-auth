@@ -7,8 +7,9 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
-from esi_auth.cli.cli_helpers import esi_auth_getter
+from esi_auth.cli.cli_helpers import esi_auth_factory
 from esi_auth.esi_auth import EveCredentials
+from esi_auth.settings import get_settings
 
 app = typer.Typer(
     help="Manage stored EVE Online application credentials.", no_args_is_help=True
@@ -16,9 +17,8 @@ app = typer.Typer(
 
 
 @app.command("list", help="List all stored application credentials.")
-def list_credentials(ctx: typer.Context):
+def list_credentials():
     """List all stored application credentials in a table format."""
-    # settings = get_settings()
     console = Console()
     console.rule(
         "[bold blue]List Stored EVE Online Application Credentials[/bold blue]"
@@ -31,8 +31,9 @@ def list_credentials(ctx: typer.Context):
     table.add_column("Callback URL", style="yellow")
     table.add_column("Scopes", style="white")
 
-    auth_store = esi_auth_getter(ctx)
-    credentials = auth_store.list_credentials()
+    settings = get_settings()
+    esi_auth = esi_auth_factory(settings)
+    credentials = esi_auth.list_credentials()
 
     for cred in credentials:
         table.add_row(
@@ -48,7 +49,6 @@ def list_credentials(ctx: typer.Context):
 
 @app.command("add", help="Add new application credentials from file.")
 def add_credentials(
-    ctx: typer.Context,
     file_path: Annotated[
         str, typer.Argument(help="Path to the JSON file with credentials")
     ],
@@ -79,8 +79,9 @@ def add_credentials(
                 scopes=cred_json["scopes"],
             )
 
-            auth_store = esi_auth_getter(ctx)
-            auth_store.store_credentials(credentials)
+            settings = get_settings()
+            esi_auth = esi_auth_factory(settings)
+            esi_auth.store_credentials(credentials)
             console.print(
                 f"[green]Successfully added credentials for {credentials.name}[/green]"
             )
@@ -89,7 +90,7 @@ def add_credentials(
 
 
 @app.command("remove", help="Remove application credentials by client ID.")
-def remove_credentials(ctx: typer.Context, client_id: str):
+def remove_credentials(client_id: str):
     """Remove application credentials by client ID."""
     console = Console()
     console.rule(
@@ -97,12 +98,13 @@ def remove_credentials(ctx: typer.Context, client_id: str):
     )
 
     try:
-        auth_store = esi_auth_getter(ctx)
-        credentials = auth_store.get_credentials_from_id(client_id)
+        settings = get_settings()
+        esi_auth = esi_auth_factory(settings)
+        credentials = esi_auth.get_credentials_from_id(client_id)
         if credentials is None:
             console.print(f"[red]No credentials found for client ID {client_id}[/red]")
             raise typer.Exit(code=1)
-        auth_store.remove_credentials(credentials)
+        esi_auth.remove_credentials(credentials)
         console.print(
             f"[green]Successfully removed credentials for client ID {client_id}[/green]"
         )

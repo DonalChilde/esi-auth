@@ -660,7 +660,7 @@ class EsiAuth:
         tokens = self.store.tokens.get(credentials.client_id, {})
         return deepcopy(list(tokens.values()))
 
-    def get_token_from_id(
+    async def get_token_from_id(
         self, character_id: int, credentials: EveCredentials, buffer: int = 5
     ) -> CharacterToken | None:
         """Get a character token by character ID.
@@ -685,7 +685,7 @@ class EsiAuth:
                 return deepcopy(char_token)
             if char_token.needs_refresh(buffer):
                 try:
-                    updated = asyncio.run(self._refresh_token(token=char_token))
+                    updated = await self._refresh_token(token=char_token)
                 except Exception as e:
                     raise AuthStoreException(f"Failed to refresh token {e}") from e
                 self.store_token(token=updated, credentials=credentials)
@@ -742,7 +742,7 @@ class EsiAuth:
                 f"There was an error while trying to refresh the token {e}"
             ) from e
 
-    def get_all_tokens(
+    async def get_all_tokens(
         self, credentials: EveCredentials, buffer: int = 5
     ) -> list[CharacterToken]:
         """Get all character tokens for given credentials.
@@ -763,7 +763,11 @@ class EsiAuth:
             dirty = False
             needs_refresh = [x for x in copied_tokens if x.needs_refresh(buffer)]
             ready_tokens = [x for x in copied_tokens if not x.needs_refresh(buffer)]
-            refreshed_tokens = asyncio.run(self._refresh_all_tokens(needs_refresh))
+            try:
+                refreshed_tokens = await self._refresh_all_tokens(needs_refresh)
+            except Exception as e:
+                logger.error(f"Error refreshing tokens: {e}", exc_info=True)
+                raise AuthStoreException(f"Error refreshing tokens: {e}") from e
             failed: list[BaseException] = []
             for token in refreshed_tokens:
                 if isinstance(token, BaseException):
@@ -893,7 +897,7 @@ class TokenManager:
         )
         return esi_auth
 
-    def get_character_tokens(
+    async def get_character_tokens(
         self, credential_alias: str, buffer: int = 5
     ) -> list[CharacterToken]:
         """Get all character tokens from the store.
@@ -909,7 +913,7 @@ class TokenManager:
         credentials = esi_auth.get_credentials_from_alias(credential_alias)
         if credentials is None:
             return []
-        tokens = esi_auth.get_all_tokens(credentials, buffer=buffer)
+        tokens = await esi_auth.get_all_tokens(credentials, buffer=buffer)
         return tokens
 
 

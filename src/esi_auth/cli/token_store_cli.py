@@ -169,7 +169,7 @@ def list_characters(
         client_alias=client_alias,
     )
 
-    character_tokens = esi_auth.get_all_tokens(credentials=credentials)
+    character_tokens = asyncio.run(esi_auth.get_all_tokens(credentials=credentials))
 
     if not character_tokens:
         console.print("No authorized characters found.", style="yellow")
@@ -272,15 +272,17 @@ def refresh(
     else:
         # Refresh all Characters needing refresh
         console.print("Before refresh:")
-        character_tokens = esi_auth.get_all_tokens(credentials=credentials, buffer=-1)
+        character_tokens = asyncio.run(
+            esi_auth.get_all_tokens(credentials=credentials, buffer=-1)
+        )
         table = character_list_table(
             characters=character_tokens,
             buffer_minutes=MIN_BUFFER_MINUTES,
         )
         console.print(table)
         console.print(f"After refresh:")
-        refreshed_characters = esi_auth.get_all_tokens(
-            credentials=credentials, buffer=min_buffer_minutes
+        refreshed_characters = asyncio.run(
+            esi_auth.get_all_tokens(credentials=credentials, buffer=min_buffer_minutes)
         )
         table = character_list_table(
             characters=refreshed_characters, buffer_minutes=MIN_BUFFER_MINUTES

@@ -660,7 +660,7 @@ class EsiAuth:
         tokens = self.store.tokens.get(credentials.client_id, {})
         return deepcopy(list(tokens.values()))
 
-    async def get_token_from_id(
+    async def get_token(
         self, character_id: int, credentials: EveCredentials, buffer: int = 5
     ) -> CharacterToken | None:
         """Get a character token by character ID.

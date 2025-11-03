@@ -114,8 +114,10 @@ def remove(
         client_id=client_id,
         client_alias=client_alias,
     )
-    character_token = esi_auth.get_token_from_id(
-        credentials=credentials, character_id=character_id
+    character_token = asyncio.run(
+        esi_auth.get_token(
+            credentials=credentials, character_id=character_id, buffer=-1
+        )
     )
     if not character_token:
         console.print(
@@ -244,8 +246,10 @@ def refresh(
 
     # Refresh one Character needing refresh
     if character_id:
-        character = esi_auth.get_token_from_id(
-            credentials=credentials, character_id=character_id, buffer=-1
+        character = asyncio.run(
+            esi_auth.get_token(
+                credentials=credentials, character_id=character_id, buffer=-1
+            )
         )
         if not character:
             console.print(
@@ -259,10 +263,12 @@ def refresh(
         )
         console.print(table)
         console.print(f"After refresh:")
-        refreshed_character = esi_auth.get_token_from_id(
-            credentials=credentials,
-            character_id=character_id,
-            buffer=min_buffer_minutes,
+        refreshed_character = asyncio.run(
+            esi_auth.get_token(
+                credentials=credentials,
+                character_id=character_id,
+                buffer=min_buffer_minutes,
+            )
         )
         table = character_list_table(
             characters=[refreshed_character] if refreshed_character else [],

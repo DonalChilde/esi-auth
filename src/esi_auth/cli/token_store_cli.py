@@ -57,7 +57,7 @@ def add(
         client_id=client_id,
         client_alias=client_alias,
     )
-    auth_request = esi_auth.prepare_request(credentials=credentials)
+    auth_request = esi_auth.prepare_authorization_request(credentials=credentials)
     logger.info(f"Attempting to add character authorization using the following url.")
     logger.info(f"{auth_request.sso_url}")
     console.print()

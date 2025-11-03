@@ -470,7 +470,7 @@ class EsiAuth:
     #############################################################################
     # Authentication Flow Methods
     #############################################################################
-    def prepare_request(self, credentials: EveCredentials) -> AuthRequest:
+    def prepare_authorization_request(self, credentials: EveCredentials) -> AuthRequest:
         """Prepare a request for an authorization code."""
         code_verifier, code_challenge = AH.generate_code_challenge()
         sso_url, state = AH.redirect_to_sso(

@@ -1,6 +1,15 @@
 # Changelog
 
 <!-- markdownlint-disable MD024 -->
+<!--
+Possible Tags:
+ - Added
+ - Changed
+ - Deprecated
+ - Removed
+ - Fixed
+ - Security
+-->
 <!-- changelog-begin -->
 
 ## [Unreleased](https://github.com/DonalChilde/esi-auth/compare/0.1.0...dev)

@@ -20,7 +20,7 @@ First, create an EVE Online application at [EVE Developers](https://developers.e
 
 ### 2. Setup the Environment
 
-On first run (try `esi-auth version`), esi-auth will create a directory in the default application location as defined by Typer. This directory will contain the program logs,the .env configuation file, and the auth store data file. Edit the .env file to set your UserAgent information. This is required before the first network access.
+On first run (try `esi-auth version`), esi-auth will create a directory in the default application location as defined by Typer. This directory will contain the program logs, the .env configuation file, and the auth store data file.
 
 ### 3. Add your credentials to esi-auth
 

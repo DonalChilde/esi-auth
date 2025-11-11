@@ -1,11 +1,60 @@
-# ESI Auth - An EVE Online Authentication Library
+# ESI Auth - EVE Online Authentication Library
 
-[![uv](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/uv/main/assets/badge/v0.json)](https://github.com/astral-sh/uv)
-[![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
+A simple and robust Python library for managing EVE Online ESI app credentials and authentication tokens. This library handles the complete OAuth2 authentication flow, token storage, and refresh operations for EVE Online's ESI (EVE Swagger Interface) API.
 
-## Project Description
+## Features
 
-esi-auth is a library and cli for managing EVE Online ESI app credentials and authentication tokens. This library handles the complete OAuth2 PKCE authentication flow, token storage, and refresh operations for EVE Online's ESI API.
+- 🔐 **Complete PKCE OAuth2 Flow**: Handles authorization, token exchange, and refresh
+- 💾 **Persistent Storage**: JSON-based credential and token storage in a single file.
+- 🔄 **Automatic Token Refresh**: Smart token refresh with configurable timing.
+- 🖥️ **CLI Interface**: Full-featured command-line interface
+
+## TODO
+
+- Testing
+- pypi release
+
+## Installation
+
+Install with pip (once published):
+
+```bash
+# Not published to pypi yet...
+pip install esi-auth
+```
+
+Install with uv:
+
+```bash
+# run esi-auth without installing to Path
+uvx --from git+https://github.com/DonalChilde/esi-auth@main esi-auth
+
+# OR
+
+# Install to Path
+uv tool install --from git+https://github.com/DonalChilde/esi-auth@main esi-auth
+# and run
+uvx esi-auth
+
+
+```
+
+Or for development:
+
+```bash
+git clone https://github.com/DonalChilde/esi-auth.git
+cd esi-auth
+uv sync
+```
+
+For use in a project:
+
+```toml
+# in your pyproject file, for a uv managed project
+dependencies = ["esi-auth"]
+[tool.uv.sources]
+esi-auth = { git = "https://github.com/DonalChilde/esi-auth", branch = "main" }
+```
 
 ## Quick Start
 
@@ -43,73 +92,6 @@ If it does not, you can either click on the link in the terminal, or see the log
 ## API Usage
 
 The primary path for auth store modification should be through the esi-auth CLI. For access to the CharacterTokens from a third party app, that app can use the TokenManager object. This allows a third party app to get a copy of all the tokens for a particular client alias. Each time tokens are requested, the store file will be loaded, and the tokens checked for refresh.
-
-## Installation
-
-This project uses uv for development, and uv is also the easiest way to run the project.
-
-> uv docs:  
-> [Astral - uv](https://docs.astral.sh/uv/)  
-> [https://docs.astral.sh/uv/concepts/tools/](https://docs.astral.sh/uv/concepts/tools/)  
-> [https://docs.astral.sh/uv/reference/cli/#uv-tool](https://docs.astral.sh/uv/reference/cli/#uv-tool)  
-> [https://docs.astral.sh/uv/pip/packages/#installing-a-package](https://docs.astral.sh/uv/pip/packages/#installing-a-package)  
-> [https://docs.astral.sh/uv/concepts/projects/dependencies/#dependency-sources](https://docs.astral.sh/uv/concepts/projects/dependencies/#dependency-sources)
-
-To run with uv:
-
-> Note the url format for tool install is the same as that for uv pip install:
-
-```bash
-# run esi-auth without installing
-uvx --from git+https://github.com/DonalChilde/esi-auth@main esi-auth
-
-# OR
-
-# Install to Path
-uv tool install --from git+https://github.com/DonalChilde/esi-auth@main esi-auth
-# and run
-esi-auth ARGS
-```
-
-## Development
-
-### Download the source code:
-
-```bash
-git clone https://github.com/DonalChilde/esi-auth.git
-cd esi-auth
-uv sync
-# activate the venv if desired
-source ./.venv/bin/activate
-```
-
-### Use as a dependency in another project:
-
-```toml
-# in your pyproject.toml file, for a uv managed project
-dependencies = ["esi-auth"]
-[tool.uv.sources]
-esi-auth = { git = "https://github.com/DonalChilde/esi-auth", branch = "main" }
-```
-
-### ruff settings for formatting and linting
-
-```toml
-[tool.ruff.lint]
-select = ["B", "UP", "D", "DOC", "FIX", "I", "F401"]
-# non-imperative-mood (D401)
-ignore = ["D401", "D101"]
-# extend-select = ["I"]
-
-[tool.ruff.lint.pydocstyle]
-convention = "google"
-
-[tool.ruff.format]
-docstring-code-format = true
-docstring-code-line-length = 88
-```
-
-## Contributing
 
 ## License
 

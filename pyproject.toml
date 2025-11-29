@@ -1,6 +1,6 @@
 [project]
 name = "esi-auth"
-version = "0.2.0"
+version = "0.3.0"
 description = "A simple Eve Online authentication library"
 readme = "README.md"
 authors = [{ name = "Chad Lowe", email = "pfmsoft.dev@gmail.com" }]
@@ -83,7 +83,7 @@ docstring-code-line-length = 88
 
 [tool.scriv]
 #version = "literal: pyproject.toml: project.version"
-version = "literal: src/esi-auth/__init__.py: __version__"
+version = "literal: src/esi_auth/__init__.py: __version__"
 format = "md"
 md_header_level = "2"
 entry_title_template = "file: changelog.d/templates/entry_title_template.md.j2"

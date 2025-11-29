@@ -4,7 +4,7 @@ A simple library for managing EVE Online ESI authentication tokens.
 """
 
 __app_name__ = "esi-auth"
-__version__ = "0.2.0"
+__version__ = "0.3.0"
 __author__ = "Chad Lowe"
 __author_email__ = "pfmsoft.dev@gmail.com"
 __license__ = "MIT"

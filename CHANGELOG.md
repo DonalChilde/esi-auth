@@ -27,7 +27,7 @@ Possible Tags:
 
 ### Whats Changed in 0.3.0
 
-Talk about the changes in general
+A working app! Still lots to do, but you can currently auth characters, and refresh tokens. 
 
 ### Added
 

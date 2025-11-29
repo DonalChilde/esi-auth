@@ -22,7 +22,7 @@
    - NOTES ABOUT EDITING CHANGELOG FILE
  - ensure tests pass
  - check docs are up to date.
- - tag the release using `0.0.0` format
+ - tag the release using `0.0.0` format `git tag -a <tag_name> -m "Tag message"`
  - push tag to origin with `git push origin <tagname>`
  - Ensure local branch pushed to origin
  - Accept PR, and merge to dev. ENSURE MERGING TO THE CORRECT BRANCH!

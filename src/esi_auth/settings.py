@@ -1,6 +1,7 @@
 """Settings for the ESI Auth application."""
 
 from pathlib import Path
+from typing import Any, TypedDict
 
 import typer
 from pydantic import Field
@@ -14,6 +15,19 @@ USER_AGENT = f"{__app_name__}/{__version__} (+{__url__})"
 NAMESPACE = "pfmsoft"
 APPLICATION_NAME = "esi-auth"
 DEFAULT_APP_DIR = Path(typer.get_app_dir(f"{NAMESPACE}-{APPLICATION_NAME}"))
+
+
+class ConfigDict(TypedDict):
+    """Configuration dictionary type for EsiAuthSettings.
+
+    This TypedDict defines the possible keys and their types that can be
+    used to configure the EsiAuthSettings via the get_settings function.
+    """
+
+    log_dir: Path
+    app_dir: Path
+    connection_string: str
+    auth_server_timeout: int
 
 
 class EsiAuthSettings(BaseSettings):
@@ -43,13 +57,39 @@ class EsiAuthSettings(BaseSettings):
     )
 
 
-def get_settings() -> EsiAuthSettings:
+def get_settings(
+    config_dict: ConfigDict | None = None, **kwargs: Any
+) -> EsiAuthSettings:
     """Retrieve the ESI Auth settings.
+
+    An optional config_dict can be provided to supply configuration values.
+    These values will override any defaults in EsiAuthSettings, as well as values
+    loaded from env files or the os environment. This is useful for testing, debugging,
+    or programmatically setting configuration for third party integrations.
+
+    Args:
+        config_dict: Optional dictionary containing app configuration values.
+            If provided, values from this dict will be combined with
+            kwargs, with kwargs taking precedence for duplicate keys.
+        **kwargs: Additional keyword arguments to pass directly to EsiAuthSettings.
+            These will override any matching keys from config_dict if both are provided.
+            They are intended to allow for dynamic overrides of pydantic BaseSettings behavior.
 
     Returns:
         An instance of EsiAuthSettings with the loaded configuration.
+
+    Examples:
+        >>> settings = get_settings()
+        >>> settings = get_settings(config_dict=ConfigDict(key="value"))
+        >>> settings = get_settings(
+        ...     config_dict=ConfigDict(key="value"), pydantic_base_setting="another_value"
+        ... )
     """
-    return EsiAuthSettings()
+    if config_dict is not None:
+        combined_kwargs: dict[str, Any] = config_dict | kwargs
+        return EsiAuthSettings(**combined_kwargs)
+    else:
+        return EsiAuthSettings(**kwargs)
 
 
 def env_example(app_dir: Path | None = None) -> str:

@@ -23,7 +23,7 @@ Possible Tags:
 <!-- scriv-insert-here -->
 
 <a id='changelog-0.3.0'></a>
-## [0.3.0](https://github.com/DonalChilde/esi-auth/compare/0.0.0...0.3.0) —  2025-11-29
+## [0.3.0](https://github.com/DonalChilde/esi-auth/compare/0.1.0...0.3.0) —  2025-11-29
 
 ### Whats Changed in 0.3.0
 

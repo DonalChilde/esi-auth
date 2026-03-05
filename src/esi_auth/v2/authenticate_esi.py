@@ -4,10 +4,6 @@ These functions are broken down into discrete steps that can be used
 individually or together to implement the OAuth2 authorization code flow with PKCE.
 """
 
-############################################################################
-# These TypedDicts are used for type hinting the JSON responses from the SSO
-# and token endpoints.
-############################################################################
 import asyncio
 import base64
 import hashlib
@@ -16,15 +12,50 @@ import random
 import secrets
 import string
 from collections.abc import Sequence
-from typing import Any, TypedDict
-from urllib.parse import urlencode
+from typing import TypedDict
+from urllib.parse import urlencode, urlparse
 
 import aiohttp
 import jwt
 from aiohttp import web
 from jwt.jwks_client import PyJWKClient
+from rich.console import Console
+from rich.json import JSON
+from rich.prompt import Prompt
+from whenever import Instant
 
 logger = logging.getLogger(__name__)
+
+
+# ------------------------------------------------------------------------------------
+# Models
+# ------------------------------------------------------------------------------------
+
+
+class OauthSettings(TypedDict):
+    """Settings for OAuth2 authentication flow."""
+
+    audience: str
+    metadata_endpoint: str
+    authorization_endpoint: str
+    token_endpoint: str
+    jwks_uri: str
+    revocation_endpoint: str
+    issuers: list[str]
+
+
+# These settings are current as of 2026-03-04, and are not likely to change much.
+# They are included here for convenience, but can also be fetched dynamically from the metadata endpoint if needed.
+# The current settings can be found at https://login.eveonline.com/.well-known/oauth-authorization-server
+OAUTH_SETTINGS = OauthSettings(
+    audience="EVE Online",
+    metadata_endpoint="https://login.eveonline.com/.well-known/oauth-authorization-server",
+    authorization_endpoint="https://login.eveonline.com/v2/oauth/authorize",
+    token_endpoint="https://login.eveonline.com/v2/oauth/token",
+    jwks_uri="https://login.eveonline.com/oauth/jwks",
+    revocation_endpoint="https://login.eveonline.com/v2/oauth/revoke",
+    issuers=["https://login.eveonline.com"],
+)
 
 
 class JWK(TypedDict):
@@ -44,21 +75,32 @@ class JWKS(TypedDict):
     keys: list[JWK]
 
 
-type ValidatedToken = dict[str, Any]
+# type ValidatedToken = dict[str, Any]
 
 
-# class ValidatedToken(TypedDict):
-#     """Represents a validated character token."""
+class ValidatedToken(TypedDict):
+    """Represents a validated/decoded character token.
 
-#     pass
-#     # TODO check the actual fields
-#     # character_id: int
-#     # character_name: str
-#     # expires_on: str
-#     # scopes: list[str]
-#     # token_type: str
-#     # character_owner_hash: str
-#     # verified_at: str
+    This information is extracted from the JWT access token after it has been validated.
+
+    The sub field contains the character ID in `CHARACTER:EVE:<character_id>` format,
+    the azp field contains the client ID, and the name field contains the character name.
+    """
+
+    scp: str
+    jti: str
+    kid: str
+    sub: str
+    azp: str
+    tenant: str
+    tier: str
+    region: str
+    aud: list[str]
+    name: str
+    owner: str
+    exp: int
+    iat: int
+    iss: str
 
 
 class OauthMetadata(TypedDict):
@@ -87,7 +129,13 @@ class OauthToken(TypedDict):
     refresh_token: str
 
 
-############################################################################
+class PKCECodeChallenge(TypedDict):
+    """PKCE code challenge and verifier pair."""
+
+    code_verifier: str
+    code_challenge: str
+
+
 class AuthenticationError(Exception):
     """Exception raised during authentication process.
 
@@ -107,17 +155,45 @@ class AuthenticationError(Exception):
         self.error_code = error_code
 
 
-def generate_code_challenge() -> tuple[str, str]:
-    """Generates a code challenge for PKCE.
+# ------------------------------------------------------------------------------------
+# Helper functions
+# ------------------------------------------------------------------------------------
+
+
+def generate_code_challenge() -> PKCECodeChallenge:
+    """Generates a code challenge for PKCE using SHA-256.
 
     Returns:
-        A tuple containing the code verifier and code challenge.
+        A CodeChallenge containing the code verifier and code challenge.
     """
     code_verifier = base64.urlsafe_b64encode(secrets.token_bytes(32))
     sha256 = hashlib.sha256()
     sha256.update(code_verifier)
     code_challenge = base64.urlsafe_b64encode(sha256.digest()).decode().rstrip("=")
-    return (code_verifier.decode(), code_challenge)
+    return PKCECodeChallenge(
+        code_verifier=code_verifier.decode(), code_challenge=code_challenge
+    )
+
+
+def callback_uri(
+    host: str = "localhost", port: int = 8080, route: str = "/callback"
+) -> str:
+    """Generate the OAuth callback URI.
+
+    Args:
+        host: The hostname for the callback (default: localhost).
+        port: The port for the callback (default: 8080).
+        route: The route for the callback (default: /callback).
+
+    Returns:
+        The full callback URI.
+    """
+    return f"http://{host}:{port}{route}"
+
+
+# ------------------------------------------------------------------------------------
+# Meat and Potatoes
+# ------------------------------------------------------------------------------------
 
 
 async def request_token(
@@ -126,7 +202,7 @@ async def request_token(
     code_verifier: str,
     token_endpoint: str,
     user_agent: str,
-    client_session: aiohttp.ClientSession,
+    client_session: aiohttp.ClientSession | None,
 ) -> OauthToken:
     """Takes an authorization code and code verifier and exchanges it for an access token and refresh token.
 
@@ -145,6 +221,8 @@ async def request_token(
         ValueError: If client_session is not initialized.
         aiohttp.ClientResponseError: If the token request fails.
     """
+    if not client_session:
+        client_session = aiohttp.ClientSession()
     if not client_session:
         raise ValueError("client_session must be initialized to request token.")
     headers = {
@@ -259,16 +337,6 @@ async def fetch_oauth_metadata(
     response.raise_for_status()
     result = await response.json()
     return result
-
-
-def fetch_oauth_metadata_sync(url: str, user_agent: str) -> OauthMetadata:
-    """Fetch the OAuth2 metadata from EVE Online in a blocking manner."""
-
-    async def fetch() -> OauthMetadata:
-        async with aiohttp.ClientSession() as session:
-            return await fetch_oauth_metadata(session, url, user_agent)
-
-    return asyncio.run(fetch())
 
 
 async def fetch_jwks(
@@ -392,69 +460,16 @@ async def revoke_refresh_token(
     logger.info("Token revoked successfully")
 
 
-def callback_uri(
-    host: str = "localhost", port: int = 8080, route: str = "/callback"
-) -> str:
-    """Generate the OAuth callback URI.
-
-    Args:
-        host: The hostname for the callback (default: localhost).
-        port: The port for the callback (default: 8080).
-        route: The route for the callback (default: /callback).
-
-    Returns:
-        The full callback URI.
-    """
-    return f"http://{host}:{port}{route}"
-
-
-def get_authorization_code(
-    expected_state: str,
-    callback_host: str = "localhost",
-    callback_port: int = 8080,
-    callback_route: str = "/callback",
-) -> str:
-    """Run temporary HTTP server to receive OAuth callback.
-
-    Convenience wrapper to run the async server in a blocking manner, suitable
-    for use in synchronous code.
-
-    Args:
-        expected_state: The state parameter to validate.
-        callback_host: The hostname for the callback server (default: localhost).
-        callback_port: The port for the callback server (default: 8080).
-        callback_route: The route for the callback (default: /callback).
-
-    Returns:
-        The authorization code from the callback.
-
-    Raises:
-        AuthenticationError: If callback handling fails.
-    """
-    return asyncio.run(
-        run_callback_server(
-            callback_host=callback_host,
-            callback_port=callback_port,
-            expected_state=expected_state,
-            callback_route=callback_route,
-        )
-    )
-
-
 async def run_callback_server(
     expected_state: str,
-    callback_host: str = "localhost",
-    callback_port: int = 8080,
-    callback_route: str = "/callback",
+    callback_url: str,
     timeout: int = 300,
 ) -> str:
     """Run temporary HTTP server to receive OAuth callback.
 
     Args:
         expected_state: The state parameter to validate.
-        callback_host: The hostname for the callback server (default: localhost).
-        callback_port: The port for the callback server (default: 8080).
-        callback_route: The route for the callback (default: /callback).
+        callback_url: The full URL for the callback server.
         timeout: Time in seconds to wait for the callback before timing out (default: 300).
 
     Returns:
@@ -512,17 +527,18 @@ async def run_callback_server(
 
     # Create and start the server
     app = web.Application()
-    app.router.add_get(callback_route, callback_handler)
+    parsed_url = urlparse(callback_url)
+    app.router.add_get(parsed_url.path, callback_handler)
 
     runner = web.AppRunner(app)
     await runner.setup()
 
-    site = web.TCPSite(runner, callback_host, callback_port)
+    site = web.TCPSite(runner, parsed_url.hostname, parsed_url.port)
 
     try:
         await site.start()
         logger.info(
-            f"Callback server started on http://{callback_host}:{callback_port}{callback_route}"
+            f"Callback server started on {callback_url}, waiting for authentication response..."
         )
 
         # Wait for callback or timeout
@@ -552,9 +568,7 @@ async def get_token_flow(
     token_endpoint: str,
     client_session: aiohttp.ClientSession,
     user_agent: str,
-    callback_host: str = "localhost",
-    callback_port: int = 8080,
-    callback_route: str = "/callback",
+    callback_url: str,
 ) -> OauthToken:
     """Run the full OAuth2 authorization code flow to get an access token.
 
@@ -562,14 +576,10 @@ async def get_token_flow(
     """
     logger.info(f"Starting authentication flow. Navigate to:")
     logger.info(sso_url)
-    logger.info(
-        f"Listening on http://{callback_host}:{callback_port}{callback_route} for callback..."
-    )
+    logger.info(f"Listening on {callback_url} for callback...")
     authorization_code = await run_callback_server(
         expected_state=state,
-        callback_host=callback_host,
-        callback_port=callback_port,
-        callback_route=callback_route,
+        callback_url=callback_url,
     )
     logger.info(f"Received authorization code: {authorization_code}")
     token = await request_token(
@@ -583,3 +593,212 @@ async def get_token_flow(
     logger.info(f"Received token: {token}")
 
     return token
+
+
+async def main():
+    """Example usage of the authentication functions."""
+    console = Console()
+    console.print("[bold green]Welcome to the ESI Authentication Example![/bold green]")
+    # Always provide a user agent when making requests to the SSO, as it is required
+    # and helps with debugging and support. Ideally, the user agent should include your
+    # application name and version, and website or contact information.
+    user_agent = "MyEveApp/1.0 (eve:MyCharacter;)"
+
+    console.print(
+        "To authenticate with EVE Online SSO, you will need to provide the following information:"
+    )
+    console.print(
+        "- Client ID: The client ID of your application registered with the EVE Online SSO."
+    )
+    console.print(
+        "- Callback URI: The URL where the SSO will redirect you after authentication. e.g http://localhost:8080/callback. "
+        "This should match the callback URI registered with your application."
+    )
+    console.print(
+        "- Scopes: The permissions you want to request access to. These should be a subset of the scopes you registered for your application."
+    )
+    console.print("")
+    console.print(
+        "You can register your application and get a client ID and set up a callback URI at https://developers.eveonline.com/applications"
+    )
+    console.print("")
+
+    # ------------------------------------------------------------------------------------
+
+    client_id = Prompt.ask("Enter your client ID")
+    console.print("")
+    default_callback_uri = "http://localhost:8080/callback"
+    entered_callback_uri = Prompt.ask(
+        "Enter your callback URI", default=default_callback_uri
+    )
+    console.print("")
+    console.print(
+        "The scopes you want to request access to. These should be registered "
+        "with the SSO and should be a all of or a subset of the scopes you registered for your application."
+    )
+    console.print("")
+    scopes_set: set[str] = set()
+    scopes: list[str] = []
+    while True:
+        scope = Prompt.ask(
+            "Enter a scope to request (or at least one space to finish)",
+            default="esi-characters.read_blueprints.v1",
+        )
+        if not scope:
+            break
+        scopes_set.add(scope)
+    scopes = list(scopes_set)
+    console.print("")
+
+    console.print(f"Client ID: {client_id}")
+    console.print(f"Callback URI: {entered_callback_uri}")
+    console.print(f"Requested scopes:")
+    console.print(JSON.from_data(scopes))
+    console.print("")
+
+    # ------------------------------------------------------------------------------------
+
+    console.print("Generating code challenge for PKCE...")
+    code_challenge = generate_code_challenge()
+    console.print(JSON.from_data(code_challenge))
+    console.print("")
+
+    console.print(
+        "Generate the SSO URL. This is the URL you will navigate to in order to authenticate."
+    )
+    sso_url, state = redirect_to_sso(
+        client_id=client_id,
+        scopes=scopes,
+        redirect_uri=entered_callback_uri,
+        authorization_endpoint=OAUTH_SETTINGS["authorization_endpoint"],
+        challenge=code_challenge["code_challenge"],
+    )
+    console.print(f"Navigate to the following URL to authenticate:")
+    console.print(f"[link={sso_url}]Click ME[/link]")
+    console.print(
+        f"Or copy and paste the URL into your browser if your terminal does not support clickable links."
+    )
+    console.print(f"{sso_url}")
+    console.print("")
+
+    console.print(f"Listening on {entered_callback_uri} for callback...")
+    console.print(
+        "The local server can take a second to start. If the link gives an error, try reloading the page after a moment."
+    )
+    # Launch a web server to listen for the callback and get the authorization code.
+    authorization_code = await run_callback_server(
+        expected_state=state, callback_url=entered_callback_uri
+    )
+    console.print(f"Received authorization code: {authorization_code}")
+    console.print("")
+
+    # -------------------------------------------------------------------------------------
+
+    # We will need a client session for the following requests.
+    async with aiohttp.ClientSession() as client_session:
+        token = await request_token(
+            client_id=client_id,
+            authorization_code=authorization_code,
+            code_verifier=code_challenge["code_verifier"],
+            token_endpoint=OAUTH_SETTINGS["token_endpoint"],
+            user_agent=user_agent,
+            client_session=client_session,
+        )
+        console.print(f"Received authentication token:")
+        console.print(JSON.from_data(token))
+        console.print("")
+
+        console.print(
+            "You can now use the access token to make authenticated requests to ESI, "
+            "and use the refresh token to get new access tokens when needed. You can also "
+            "get the character name and ID from the access token by validating and decoding "
+            "it. You will need the character id and the access token to make requests to "
+            "ESI on behalf of the character."
+        )
+        console.print("")
+
+        validated_token = validate_jwt_token(
+            access_token=token["access_token"],
+            jwks_client=None,
+            audience=OAUTH_SETTINGS["audience"],
+            issuers=OAUTH_SETTINGS["issuers"],
+            user_agent=user_agent,
+            jwks_uri=OAUTH_SETTINGS["jwks_uri"],
+        )
+        console.print("Validated token content:")
+        console.print(JSON.from_data(validated_token))
+        console.print("")
+
+        # -------------------------------------------------------------------------------------
+
+        console.print(
+            "From this, we can extract the character ID and name, and expiration time."
+        )
+        character_id = validated_token["sub"].split(":")[-1]
+        character_name = validated_token["name"]
+        expiration_time = Instant.from_timestamp(validated_token["exp"])
+        console.print(f"Character ID: {character_id}")
+        console.print(f"Character Name: {character_name}")
+        console.print(f"Token Expiration Time: {expiration_time}")
+        console.print(
+            f"Token expires in {(expiration_time - Instant.now()).in_seconds():2f} seconds"
+        )
+        console.print("")
+
+        # --------------------------------------------------------------------------------------
+
+        console.print(
+            "You can also refresh the token when it is close to expiring, using the refresh token."
+        )
+        new_token = await request_refreshed_token(
+            refresh_token=token["refresh_token"],
+            client_id=client_id,
+            token_endpoint=OAUTH_SETTINGS["token_endpoint"],
+            user_agent=user_agent,
+            client_session=client_session,
+        )
+        console.print(f"Refreshed token:")
+        console.print(JSON.from_data(new_token))
+        console.print("")
+
+        validated_new_token = validate_jwt_token(
+            access_token=new_token["access_token"],
+            jwks_client=None,
+            audience=OAUTH_SETTINGS["audience"],
+            issuers=OAUTH_SETTINGS["issuers"],
+            user_agent=user_agent,
+            jwks_uri=OAUTH_SETTINGS["jwks_uri"],
+        )
+        console.print(f"Validated refreshed token content:")
+        console.print(JSON.from_data(validated_new_token))
+        console.print("")
+
+        character_id = validated_new_token["sub"].split(":")[-1]
+        character_name = validated_new_token["name"]
+        expiration_time = Instant.from_timestamp(validated_new_token["exp"])
+        console.print(f"Character ID: {character_id}")
+        console.print(f"Character Name: {character_name}")
+        console.print(f"Token Expiration Time: {expiration_time}")
+        console.print(
+            f"Token expires in {(expiration_time - Instant.now()).in_seconds():2f} seconds"
+        )
+        console.print("")
+
+        # --------------------------------------------------------------------------------------
+
+        console.print(
+            "You can also revoke the refresh token when you no longer need it, "
+            "or if you want to force the user to re-authenticate."
+        )
+        await revoke_refresh_token(
+            access_token=new_token["access_token"],
+            revocation_endpoint=OAUTH_SETTINGS["revocation_endpoint"],
+            client_id=client_id,
+            user_agent=user_agent,
+            client_session=client_session,
+        )
+        console.print(f"Refresh token revoked successfully")
+
+
+if __name__ == "__main__":
+    asyncio.run(main())

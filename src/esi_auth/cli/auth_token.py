@@ -6,6 +6,7 @@ from typing import Annotated, cast
 import aiohttp
 import typer
 from rich.console import Console
+from rich.json import JSON
 
 from esi_auth.authenticate_esi import (
     generate_code_challenge,
@@ -111,6 +112,9 @@ def add(
     character_id = validated_token["sub"].split(":")[-1]
     character_name = validated_token.get("name", "Unknown Character")
     console.print(f"Authenticated character: {character_name} (ID: {character_id})\n")
+    console.print(f"Decoded token claims:")
+    console.print(JSON.from_data(validated_token))
+    console.print("\n")
 
     oauth_token = OauthToken.model_validate(token)
 

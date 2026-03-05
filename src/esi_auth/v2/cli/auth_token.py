@@ -1,3 +1,5 @@
+"""CLI commands for managing CharacterTokens."""
+
 import asyncio
 from typing import Annotated, cast
 
@@ -12,12 +14,16 @@ from esi_auth.v2.authenticate_esi import (
     run_callback_server,
     validate_jwt_token,
 )
-from esi_auth.v2.cli.helpers import EsiAuthSettings, load_oauth_metadata
+from esi_auth.v2.cli.helpers import (
+    EsiAuthSettings,
+    load_credentials,
+    load_oauth_metadata,
+)
 from esi_auth.v2.models import (
     CharacterToken,
     OauthToken,
 )
-from esi_auth.v2.simple_json_store import AppCredentialProvider, CharacterTokenManager
+from esi_auth.v2.simple_json_store import CharacterTokenManager
 
 app = typer.Typer(no_args_is_help=True)
 
@@ -25,20 +31,13 @@ app = typer.Typer(no_args_is_help=True)
 @app.command()
 def add(
     ctx: typer.Context,
-    alias: Annotated[str, typer.Argument(help="Alias for the app credentials.")],
 ):
     """Add a new CharacterToken."""
     settings = ctx.obj["esi-auth-settings"]
     settings = cast(EsiAuthSettings, settings)
     console = Console()
-    credential_provider = AppCredentialProvider(settings.credentials_dir)
-
-    try:
-        creds = credential_provider.by_alias(alias)
-    except Exception as e:
-        console.print(f"[red]Error checking for existing credential: {e}[/red]")
-        raise typer.Exit(code=1) from e
-    token_manager = CharacterTokenManager(settings.tokens_dir, credential_provider)
+    credentials = load_credentials(settings, console)
+    token_manager = CharacterTokenManager(settings.tokens_dir)
     try:
         oauth_metadata = load_oauth_metadata(settings)
     except Exception as e:
@@ -48,7 +47,7 @@ def add(
     challenge = generate_code_challenge()
 
     # Assemble the parameters for the OAuth flow
-    callback_url = creds.credentials.callbackUrl
+    callback_url = credentials.callbackUrl
     authorization_endpoint = oauth_metadata["authorization_endpoint"]
     code_challenge = challenge["code_challenge"]
     code_verifier = challenge["code_verifier"]
@@ -57,8 +56,8 @@ def add(
     jwks_uri = oauth_metadata["jwks_uri"]
 
     sso_url, state = redirect_to_sso(
-        client_id=creds.credentials.clientId,
-        scopes=creds.credentials.scopes,
+        client_id=credentials.clientId,
+        scopes=credentials.scopes,
         redirect_uri=callback_url,
         authorization_endpoint=authorization_endpoint,
         challenge=code_challenge,
@@ -83,7 +82,7 @@ def add(
     async def get_token():
         async with aiohttp.ClientSession() as session:
             token = await request_token(
-                client_id=creds.credentials.clientId,
+                client_id=credentials.clientId,
                 authorization_code=authorization_code,
                 code_verifier=code_verifier,
                 token_endpoint=token_endpoint,
@@ -118,7 +117,7 @@ def add(
     character_token = CharacterToken(
         character_id=int(character_id),
         character_name=character_name,
-        app_alias=alias,
+        client_id=credentials.clientId,
         refreshed_at=int(validated_token["iat"]),
         oauth_token=oauth_token,
     )
@@ -133,23 +132,16 @@ def add(
 @app.command()
 def list(
     ctx: typer.Context,
-    alias: Annotated[
-        str | None, typer.Argument(help="Alias for the app credentials.")
-    ] = None,
 ):
     """List all CharacterTokens, optionally filtered by app alias."""
     settings = ctx.obj["esi-auth-settings"]
     settings = cast(EsiAuthSettings, settings)
     console = Console()
-    credential_provider = AppCredentialProvider(settings.credentials_dir)
-    token_manager = CharacterTokenManager(settings.tokens_dir, credential_provider)
+
+    token_manager = CharacterTokenManager(settings.tokens_dir)
 
     try:
-        tokens = (
-            token_manager.list_tokens(client_alias=alias)
-            if alias
-            else token_manager.list_all_tokens()
-        )
+        tokens = asyncio.run(token_manager.list_tokens(min_seconds=-1))
     except Exception as e:
         console.print(f"[red]Error listing tokens: {e}[/red]\n")
         raise typer.Exit(code=1) from e
@@ -161,5 +153,91 @@ def list(
     console.print(f"Found {len(tokens)} token(s):\n")
     for token in tokens:
         console.print(
-            f"- {token.character_name} (ID: {token.character_id}), App Alias: {token.app_alias}, Expires in: {token.expires_in} seconds\n"
+            f"- {token.character_name} (ID: {token.character_id}), Expires in: {token.expires_in} seconds\n"
         )
+
+
+@app.command()
+def remove(
+    ctx: typer.Context,
+    character_id: Annotated[
+        int, typer.Argument(help="ID of the character token to remove.")
+    ],
+):
+    """Remove a CharacterToken by character ID."""
+    settings = ctx.obj["esi-auth-settings"]
+    settings = cast(EsiAuthSettings, settings)
+    console = Console()
+
+    token_manager = CharacterTokenManager(settings.tokens_dir)
+
+    try:
+        token_manager.remove_token(character_id)
+        console.print(f"Token for character ID {character_id} removed successfully.\n")
+    except KeyError as e:
+        console.print(f"[red]No token found for character ID {character_id}[/red]\n")
+        raise typer.Exit(code=1) from e
+    except Exception as e:
+        console.print(f"[red]Error removing token: {e}[/red]\n")
+        raise typer.Exit(code=1) from e
+
+
+@app.command()
+def refresh(
+    ctx: typer.Context,
+    character_id: Annotated[
+        int, typer.Argument(help="ID of the character token to refresh.")
+    ],
+):
+    """Refresh a CharacterToken by character ID."""
+    settings = ctx.obj["esi-auth-settings"]
+    settings = cast(EsiAuthSettings, settings)
+    console = Console()
+
+    token_manager = CharacterTokenManager(settings.tokens_dir)
+
+    try:
+        token = asyncio.run(token_manager.get_token(character_id, min_seconds=-1))
+        console.print(
+            f"Token for {token.character_name}-{token.character_id} expires in {token.expires_in} seconds.\n"
+        )
+        token = asyncio.run(token_manager.get_token(character_id, min_seconds=9000))
+        console.print(
+            f"Token for {token.character_name}-{token.character_id} has been refreshed, expires in {token.expires_in} seconds.\n"
+        )
+        return
+    except KeyError as e:
+        console.print(f"[red]No token found for character ID {character_id}[/red]\n")
+        raise typer.Exit(code=1) from e
+    except Exception as e:
+        console.print(
+            f"[red]Error refreshing token for character ID {character_id}: {e}[/red]\n"
+        )
+        raise typer.Exit(code=1) from e
+
+
+@app.command()
+def refresh_all(
+    ctx: typer.Context,
+):
+    """Refresh all CharacterTokens."""
+    settings = ctx.obj["esi-auth-settings"]
+    settings = cast(EsiAuthSettings, settings)
+    console = Console()
+
+    token_manager = CharacterTokenManager(settings.tokens_dir)
+
+    try:
+        tokens = asyncio.run(token_manager.list_tokens(min_seconds=9000))
+        if not tokens:
+            console.print("No tokens found.\n")
+            return
+
+        console.print(f"Refreshed {len(tokens)} token(s):\n")
+        for token in tokens:
+            console.print(
+                f"- {token.character_name} (ID: {token.character_id}), Expires in: {token.expires_in} seconds"
+            )
+    except Exception as e:
+        console.print(f"[red]Error refreshing tokens: {e}[/red]\n")
+        raise typer.Exit(code=1) from e

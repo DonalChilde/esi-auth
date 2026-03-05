@@ -4,7 +4,11 @@ import json
 from dataclasses import dataclass
 from pathlib import Path
 
+import typer
+from rich.console import Console
+
 from esi_auth.v2.authenticate_esi import OauthMetadata
+from esi_auth.v2.models import EveAppCredentials
 
 
 @dataclass(slots=True)
@@ -17,10 +21,10 @@ class EsiAuthSettings:
     in other apps.
 
     The context.obj should be a dict, and the settings should be stored under the
-    "esi-auth-settings" key.
+    "esi-auth-settings" key. e.g. ctx.obj["esi-auth-settings"] = EsiAuthSettings(...)
     """
 
-    credentials_dir: Path
+    credentials_file: Path
     tokens_dir: Path
     oauth_settings_file: Path
     oauth_settings_url: str
@@ -36,3 +40,21 @@ def load_oauth_metadata(settings: EsiAuthSettings) -> OauthMetadata:
         raise FileNotFoundError(
             f"OAuth settings file not found at {settings.oauth_settings_file}"
         )
+
+
+def load_credentials(settings: EsiAuthSettings, console: Console) -> EveAppCredentials:
+    """Load the app credentials from the settings file."""
+    try:
+        credentials = EveAppCredentials.model_validate_json(
+            settings.credentials_file.read_text()
+        )
+        console.print(f"App credentials loaded from {settings.credentials_file}")
+    except FileNotFoundError as e:
+        console.print(
+            f"[red]App credentials file not found at {settings.credentials_file}[/red]"
+        )
+        raise typer.Exit(code=1) from e
+    except Exception as e:
+        console.print(f"[red]Error reading app credentials: {e}[/red]")
+        raise typer.Exit(code=1) from e
+    return credentials

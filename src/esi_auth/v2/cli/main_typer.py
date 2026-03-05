@@ -40,7 +40,7 @@ def default_options(ctx: typer.Context):
     setup_logging(log_dir=settings.log_dir)
     logger.info(f"Starting {__app_name__} v{__version__}")
     settings_object = EsiAuthSettings(
-        credentials_dir=settings.app_credentials_dir,
+        credentials_file=settings.app_credentials_file,
         tokens_dir=settings.tokens_dir,
         oauth_settings_file=settings.oauth_settings_file,
         oauth_settings_url=settings.oauth_settings_url,

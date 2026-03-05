@@ -33,7 +33,7 @@ class EveAppCredentials(BaseModel):
 class CharacterToken(BaseModel):
     character_id: int
     character_name: str
-    app_alias: str
+    client_id: str
     refreshed_at: int
     oauth_token: OauthToken
 
@@ -50,8 +50,8 @@ class CharacterToken(BaseModel):
         return self.expires_at - Instant.now().timestamp()
 
 
-class AppCredentials(BaseModel):
-    alias: str
-    credentials: EveAppCredentials
+# class AppCredentials(BaseModel):
+#     alias: str
+#     credentials: EveAppCredentials
 
-    model_config = ConfigDict(frozen=True)
+#     model_config = ConfigDict(frozen=True)

@@ -19,7 +19,7 @@ license-files = ["LICENSE"]
 
 [project.scripts]
 esi-auth = "esi_auth.cli.main_typer:app"
-esi-auth2 = "esi_auth.v2.cli.main_typer:app"
+
 
 [build-system]
 requires = ["uv_build>=0.8.3,<0.9.0"]

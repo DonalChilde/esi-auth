@@ -6,13 +6,13 @@ import typer
 from rich.console import Console
 from rich.text import Text
 
-from esi_auth.v2 import __app_name__, __version__
-from esi_auth.v2.cli.app_credentials import app as app_credentials_app
-from esi_auth.v2.cli.auth_token import app as auth_token_app
-from esi_auth.v2.cli.helpers import EsiAuthSettings
-from esi_auth.v2.cli.oauth_settings import app as oauth_settings_app
-from esi_auth.v2.logging_config import setup_logging
-from esi_auth.v2.settings import (
+from esi_auth import __app_name__, __version__
+from esi_auth.cli.app_credentials import app as app_credentials_app
+from esi_auth.cli.auth_token import app as auth_token_app
+from esi_auth.cli.helpers import EsiAuthSettings
+from esi_auth.cli.oauth_settings import app as oauth_settings_app
+from esi_auth.logging_config import setup_logging
+from esi_auth.settings import (
     get_settings,
 )
 

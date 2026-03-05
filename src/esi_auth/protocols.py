@@ -2,7 +2,7 @@
 
 from typing import Protocol
 
-from esi_auth.v2.models import CharacterToken
+from esi_auth.models import CharacterToken
 
 
 class CharacterTokenProviderProtocol(Protocol):

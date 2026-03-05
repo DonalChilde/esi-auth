@@ -7,8 +7,8 @@ from pathlib import Path
 import typer
 from rich.console import Console
 
-from esi_auth.v2.authenticate_esi import OauthMetadata
-from esi_auth.v2.models import EveAppCredentials
+from esi_auth.authenticate_esi import OauthMetadata
+from esi_auth.models import EveAppCredentials
 
 
 @dataclass(slots=True)

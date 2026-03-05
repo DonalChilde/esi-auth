@@ -7,7 +7,7 @@ import typer
 from rich.console import Console
 from rich.json import JSON
 
-from esi_auth.v2.cli.helpers import EsiAuthSettings
+from esi_auth.cli.helpers import EsiAuthSettings
 
 app = typer.Typer(no_args_is_help=True)
 

@@ -8,8 +8,8 @@ from rich.console import Console
 from rich.json import JSON
 from rich.prompt import Confirm
 
-from esi_auth.v2.cli.helpers import EsiAuthSettings, load_credentials
-from esi_auth.v2.models import EveAppCredentials
+from esi_auth.cli.helpers import EsiAuthSettings, load_credentials
+from esi_auth.models import EveAppCredentials
 
 app = typer.Typer(no_args_is_help=True)
 

@@ -7,23 +7,23 @@ import aiohttp
 import typer
 from rich.console import Console
 
-from esi_auth.v2.authenticate_esi import (
+from esi_auth.authenticate_esi import (
     generate_code_challenge,
     redirect_to_sso,
     request_token,
     run_callback_server,
     validate_jwt_token,
 )
-from esi_auth.v2.cli.helpers import (
+from esi_auth.cli.helpers import (
     EsiAuthSettings,
     load_credentials,
     load_oauth_metadata,
 )
-from esi_auth.v2.models import (
+from esi_auth.models import (
     CharacterToken,
     OauthToken,
 )
-from esi_auth.v2.simple_json_store import CharacterTokenManager
+from esi_auth.simple_json_store import CharacterTokenManager
 
 app = typer.Typer(no_args_is_help=True)
 

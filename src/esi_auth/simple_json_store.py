@@ -9,13 +9,13 @@ from pathlib import Path
 import aiohttp
 from whenever import Instant
 
-from esi_auth.v2.authenticate_esi import request_refreshed_token
-from esi_auth.v2.models import CharacterToken, OauthToken
-from esi_auth.v2.protocols import (
+from esi_auth.authenticate_esi import request_refreshed_token
+from esi_auth.models import CharacterToken, OauthToken
+from esi_auth.protocols import (
     CharacterTokenManagerProtocol,
     CharacterTokenProviderProtocol,
 )
-from esi_auth.v2.settings import DEFAULT_OAUTH_SETTINGS, USER_AGENT
+from esi_auth.settings import DEFAULT_OAUTH_SETTINGS, USER_AGENT
 
 
 class CharacterTokenProvider(CharacterTokenProviderProtocol):

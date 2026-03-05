@@ -26,7 +26,7 @@ app.add_typer(
     app_credentials_app, name="creds", help="Commands for managing app credentials."
 )
 app.add_typer(
-    auth_token_app, name="auth", help="Commands for managing authentication tokens."
+    auth_token_app, name="tokens", help="Commands for managing authentication tokens."
 )
 
 

@@ -3,12 +3,11 @@
 import logging
 
 import typer
-from rich.console import Console
-from rich.text import Text
 
 from esi_auth import __app_name__, __version__
 from esi_auth.cli.app_credentials import app as app_credentials_app
 from esi_auth.cli.auth_token import app as auth_token_app
+from esi_auth.cli.config_info import app as config_info_app
 from esi_auth.cli.helpers import EsiAuthSettings
 from esi_auth.cli.oauth_settings import app as oauth_settings_app
 from esi_auth.logging_config import setup_logging
@@ -28,13 +27,17 @@ app.add_typer(
 app.add_typer(
     auth_token_app, name="tokens", help="Commands for managing authentication tokens."
 )
+# Commands at the top level for showing configuration information, etc.
+app.add_typer(config_info_app)
 
 
 @app.callback(invoke_without_command=True)
 def default_options(ctx: typer.Context):
     """Esi Auth Command Line Interface.
 
-    Insert pithy saying here
+    Manage ESI authentication tokens for EVE Online applications. This CLI allows you
+    to configure your application credentials, manage OAuth settings, and handle
+    authentication tokens for your EVE Online applications.
     """
     settings = get_settings()
     setup_logging(log_dir=settings.log_dir)
@@ -47,19 +50,3 @@ def default_options(ctx: typer.Context):
         auth_server_timeout=settings.auth_server_timeout,
     )
     ctx.obj = {"esi-auth-settings": settings_object}
-
-
-@app.command()
-def version():
-    """Show the version of Esi Auth."""
-    console = Console()
-    console.print(Text(f"{__app_name__} v{__version__}"))
-
-
-@app.command()
-def status(ctx: typer.Context):
-    """Show the status of the Esi Auth configuration."""
-    console = Console()
-    console.rule(Text("esi-auth Cli Configuration Information"))
-    settings = get_settings()
-    console.print(settings)

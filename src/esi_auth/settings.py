@@ -12,7 +12,7 @@ from esi_auth import __app_name__, __url__, __version__
 _app_env_prefix = "PFMSOFT_ESI_AUTH_"
 USER_AGENT = f"{__app_name__}/{__version__} (+{__url__})"
 NAMESPACE = "pfmsoft"
-APPLICATION_NAME = "esi-auth2"
+APPLICATION_NAME = "esi-auth"
 DEFAULT_APP_DIR = Path(typer.get_app_dir(f"{NAMESPACE}-{APPLICATION_NAME}"))
 
 

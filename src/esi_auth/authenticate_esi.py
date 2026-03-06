@@ -430,10 +430,10 @@ async def revoke_refresh_token(
     user_agent: str,
     client_session: aiohttp.ClientSession,
 ) -> None:
-    """Revoke a token.
+    """Revoke a refresh token.
 
     Args:
-        access_token: The access token to revoke.
+        refresh_token: The refresh token to revoke.
         revocation_endpoint: The revocation endpoint URI.
         client_id: The client ID of the application.
         user_agent: The User-Agent string to use in the request.
@@ -451,6 +451,7 @@ async def revoke_refresh_token(
         "token_type_hint": "refresh_token",
         "client_id": client_id,
     }
+    # FIXME Check response to make sure token revoked.
     response = await client_session.post(
         revocation_endpoint, headers=headers, data=payload
     )

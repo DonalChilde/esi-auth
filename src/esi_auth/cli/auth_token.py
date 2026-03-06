@@ -76,7 +76,11 @@ def add(
     )
     # Launch a web server to listen for the callback and get the authorization code.
     authorization_code = asyncio.run(
-        run_callback_server(expected_state=state, callback_url=callback_url)
+        run_callback_server(
+            expected_state=state,
+            callback_url=callback_url,
+            timeout=settings.auth_server_timeout,
+        )
     )
     console.print(f"Received authorization code: {authorization_code}\n")
 

@@ -202,7 +202,7 @@ async def request_token(
     code_verifier: str,
     token_endpoint: str,
     user_agent: str,
-    client_session: aiohttp.ClientSession | None,
+    client_session: aiohttp.ClientSession,
 ) -> OauthToken:
     """Takes an authorization code and code verifier and exchanges it for an access token and refresh token.
 
@@ -221,8 +221,6 @@ async def request_token(
         ValueError: If client_session is not initialized.
         aiohttp.ClientResponseError: If the token request fails.
     """
-    if not client_session:
-        client_session = aiohttp.ClientSession()
     if not client_session:
         raise ValueError("client_session must be initialized to request token.")
     headers = {
@@ -416,7 +414,7 @@ def validate_jwt_token(
             options={"verify_aud": True, "verify_iss": True},
         )
 
-        return valid_decoded_token
+        return ValidatedToken(**valid_decoded_token)
     except jwt.ExpiredSignatureError as e:
         logger.error("Token has expired")
         raise e

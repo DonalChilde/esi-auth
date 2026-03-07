@@ -1,7 +1,19 @@
 """Models for ESI Auth."""
 
+from dataclasses import dataclass
+
 from pydantic import BaseModel, ConfigDict
 from whenever import Instant
+
+
+@dataclass(slots=True, frozen=True)
+class CharacterAuth:
+    """The return from the `AuthProviderProtocol.character_auth` method."""
+
+    character_id: int
+    character_name: str
+    auth_headers: dict[str, str]
+    expires_at: int
 
 
 class OauthToken(BaseModel):

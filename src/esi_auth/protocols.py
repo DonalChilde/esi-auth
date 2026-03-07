@@ -2,7 +2,7 @@
 
 from typing import Protocol
 
-from esi_auth.models import CharacterToken
+from esi_auth.models import CharacterAuth, CharacterToken
 
 
 class CharacterTokenProviderProtocol(Protocol):
@@ -52,5 +52,23 @@ class CharacterTokenManagerProtocol(CharacterTokenProviderProtocol, Protocol):
 
         Raises:
             KeyError: If no token for the given character ID exists.
+        """
+        ...
+
+
+class AuthProviderProtocol(Protocol):
+    """Protocol for providing authentication information."""
+
+    async def character_auth(self, character_id: int) -> CharacterAuth:
+        """Return the authentication information for the given character ID.
+
+        Args:
+            character_id: The ID of the character for which to retrieve the authentication information.
+
+        Returns:
+            The authentication information for the given character ID.
+
+        Raises:
+            KeyError: If no authentication information for the given character ID exists.
         """
         ...

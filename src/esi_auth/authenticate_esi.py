@@ -12,7 +12,7 @@ import random
 import secrets
 import string
 from collections.abc import Sequence
-from typing import TypedDict
+from typing import Any, TypedDict
 from urllib.parse import urlencode, urlparse
 
 import aiohttp
@@ -424,13 +424,18 @@ def validate_jwt_token(
 
 
 async def revoke_refresh_token(
-    access_token: str,
+    refresh_token: str,
     revocation_endpoint: str,
     client_id: str,
     user_agent: str,
     client_session: aiohttp.ClientSession,
-) -> None:
+) -> Any:
     """Revoke a refresh token.
+
+    Im not sure how to tell for sure if the refresh token got revoked, except to test a
+    refresh after revocation and see if it fails. The SSO returns a 200 OK response even
+    if the token is invalid or already revoked, so we have to rely on testing the token
+    after revocation to confirm it worked.
 
     Args:
         refresh_token: The refresh token to revoke.
@@ -447,16 +452,17 @@ async def revoke_refresh_token(
         "User-Agent": user_agent,
     }
     payload: dict[str, str] = {
-        "token": access_token,
+        "token": refresh_token,
         "token_type_hint": "refresh_token",
         "client_id": client_id,
     }
-    # FIXME Check response to make sure token revoked.
+
     response = await client_session.post(
         revocation_endpoint, headers=headers, data=payload
     )
     response.raise_for_status()
-    logger.info("Token revoked successfully")
+    if response.status == 200:
+        logger.info("Token revoked successfully")
 
 
 async def run_callback_server(
@@ -594,6 +600,14 @@ async def get_token_flow(
     return token
 
 
+# ---------------------------------------------------------------------------------------
+# NOTE the following code is a working example of how to use the above functions together
+# to run through the full authentication flow, including refreshing and revoking tokens.
+# You can run this function to test the flow, or use it as a reference for how to
+# implement the flow in your own application.
+# ---------------------------------------------------------------------------------------
+
+
 async def main():
     """Example usage of the authentication functions."""
     console = Console()
@@ -601,7 +615,7 @@ async def main():
     # Always provide a user agent when making requests to the SSO, as it is required
     # and helps with debugging and support. Ideally, the user agent should include your
     # application name and version, and website or contact information.
-    user_agent = "MyEveApp/1.0 (eve:MyCharacter;)"
+    user_agent = "authenticate-esi.py/1.0 (eve:Donal Childe; Github:DonalChilde)"
 
     console.print(
         "To authenticate with EVE Online SSO, you will need to provide the following information:"
@@ -610,15 +624,18 @@ async def main():
         "- Client ID: The client ID of your application registered with the EVE Online SSO."
     )
     console.print(
-        "- Callback URI: The URL where the SSO will redirect you after authentication. e.g http://localhost:8080/callback. "
+        "- Callback URI: The URL where the SSO will redirect you after authentication. "
+        "e.g http://localhost:8080/callback. "
         "This should match the callback URI registered with your application."
     )
     console.print(
-        "- Scopes: The permissions you want to request access to. These should be a subset of the scopes you registered for your application."
+        "- Scopes: The permissions you want to request access to. These should be all or "
+        "some of the scopes you registered for your application."
     )
     console.print("")
     console.print(
-        "You can register your application and get a client ID and set up a callback URI at https://developers.eveonline.com/applications"
+        "You can register your application and get a client ID and set up a callback URI "
+        "at https://developers.eveonline.com/applications"
     )
     console.print("")
 
@@ -641,7 +658,7 @@ async def main():
     while True:
         scope = Prompt.ask(
             "Enter a scope to request (or at least one space to finish)",
-            default="esi-characters.read_blueprints.v1",
+            default="esi-skills.read_skills.v1",
         )
         if not scope:
             break
@@ -746,6 +763,26 @@ async def main():
 
         # --------------------------------------------------------------------------------------
 
+        url = f"https://esi.evetech.net/characters/{character_id}/attributes"
+        headers = {
+            "User-Agent": user_agent,
+            "Authorization": f"Bearer {token['access_token']}",
+        }
+        response = await client_session.get(url, headers=headers)
+        if response.status == 200:
+            character_attributes = await response.json()
+            console.print(
+                f"Successfully made authenticated request to ESI using access token:"
+            )
+            console.print(JSON.from_data(character_attributes))
+        else:
+            console.print(
+                f"Failed to make authenticated request to ESI: {response.status} {response.reason}"
+            )
+        console.print("")
+
+        # --------------------------------------------------------------------------------------
+
         console.print(
             "You can also refresh the token when it is close to expiring, using the refresh token."
         )
@@ -786,17 +823,38 @@ async def main():
         # --------------------------------------------------------------------------------------
 
         console.print(
-            "You can also revoke the refresh token when you no longer need it, "
-            "or if you want to force the user to re-authenticate."
+            "You can also revoke the refresh token when you no longer need it,  e.g. "
+            "if the character is unsubscribing from your application, "
+            "or if you want to force the user to re-authenticate.\n"
         )
+        console.print("Revoking the refresh token...\n")
         await revoke_refresh_token(
-            access_token=new_token["access_token"],
+            refresh_token=new_token["refresh_token"],
             revocation_endpoint=OAUTH_SETTINGS["revocation_endpoint"],
             client_id=client_id,
             user_agent=user_agent,
             client_session=client_session,
         )
-        console.print(f"Refresh token revoked successfully")
+        await asyncio.sleep(
+            1
+        )  # Wait a moment to ensure revocation is processed before testing the token
+        try:
+            await request_refreshed_token(
+                refresh_token=new_token["refresh_token"],
+                client_id=client_id,
+                token_endpoint=OAUTH_SETTINGS["token_endpoint"],
+                user_agent=user_agent,
+                client_session=client_session,
+            )
+        except aiohttp.ClientResponseError as e:
+            if e.status == 400:
+                console.print(
+                    "Refresh token revoked successfully. Attempting to use it resulted in expected error."
+                )
+            else:
+                console.print(
+                    f"Unexpected error when testing revoked token: {e.status} {e.message}"
+                )
 
 
 if __name__ == "__main__":

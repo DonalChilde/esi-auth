@@ -763,6 +763,14 @@ async def main():
 
         # --------------------------------------------------------------------------------------
 
+        console.print(
+            "You can also use the access token to make authenticated requests to ESI. "
+            "Here is an example of making a request to the character attributes endpoint."
+        )
+        console.print(
+            "This assumes that the access token has the necessary scopes to "
+            "access this endpoint, the esi-skills.read_skills.v1 scope in this case."
+        )
         url = f"https://esi.evetech.net/characters/{character_id}/attributes"
         headers = {
             "User-Agent": user_agent,

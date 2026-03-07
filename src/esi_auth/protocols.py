@@ -72,3 +72,7 @@ class AuthProviderProtocol(Protocol):
             KeyError: If no authentication information for the given character ID exists.
         """
         ...
+
+    def available_characters(self) -> list[int]:
+        """Return a list of character IDs for which authentication information is available."""
+        ...

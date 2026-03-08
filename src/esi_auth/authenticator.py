@@ -1,12 +1,7 @@
 """Authenticator class for handling ESI SSO authentication flows."""
 
 import asyncio
-import base64
-import hashlib
 import logging
-import secrets
-import string
-from random import choices
 from typing import Self
 from urllib.parse import urlencode, urlparse
 
@@ -15,6 +10,10 @@ import jwt
 from aiohttp import web
 from jwt.jwks_client import PyJWKClient
 
+from esi_auth.helpers.code_challenge import (
+    generate_code_challenge_and_verifier,
+)
+from esi_auth.helpers.secure_random_string import generate_secure_random_string
 from esi_auth.models import (
     CharacterToken,
     OauthMetadata,
@@ -28,7 +27,6 @@ from esi_auth.settings import USER_AGENT
 logger = logging.getLogger(__name__)
 
 
-# TODO expand the docs. Emphasize launching the browser with sso url.
 class AuthenticationError(Exception):
     """Exception raised during authentication process.
 
@@ -66,6 +64,7 @@ class Authenticator(AuthenticatorProtocol):
         jwks_uri: str = "https://login.eveonline.com/oauth/jwks",
         revocation_endpoint: str = "https://login.eveonline.com/v2/oauth/revoke",
         issuer: str = "https://login.eveonline.com",
+        token_alg: str = "RS256",
     ) -> None:
         self.metadata_endpoint = metadata_endpoint
         self.authorization_endpoint = authorization_endpoint
@@ -78,6 +77,7 @@ class Authenticator(AuthenticatorProtocol):
         self.scopes = scopes
         self.callback_url = callback_url
         self.jwks_client = None  # This will be initialized on the first token request
+        self.token_alg = token_alg
 
     async def request_character_token(
         self, params: RequestParams, timeout: int = 300
@@ -157,7 +157,7 @@ class Authenticator(AuthenticatorProtocol):
 
         This method can be used to initialize any necessary state or perform any necessary setup before making requests.
         """
-        code_challenge, code_verifier = self._generate_code_challenge_and_verifier()
+        code_challenge, code_verifier = generate_code_challenge_and_verifier()
         url, state = self._generate_url_and_state(code_challenge, scopes)
         return RequestParams(
             url=url,
@@ -217,25 +217,25 @@ class Authenticator(AuthenticatorProtocol):
         )
 
     def _validate_jwt_token(self, access_token: str) -> ValidatedToken:
-        """Validate a JWT token using the JWKs from the ESI SSO.
-
-        This method should be implemented by subclasses to provide the actual logic for validating a JWT token.
-        """
+        """Validate a JWT token using the JWKs from the ESI SSO."""
         if not self.jwks_client:
             self.jwks_client = PyJWKClient(
                 self.jwks_uri, headers={"User-Agent": USER_AGENT}
             )
 
         unverified_header = jwt.get_unverified_header(access_token)
-        kid = unverified_header["kid"]
-        alg = unverified_header["alg"]
-        signing_key = self.jwks_client.get_signing_key(kid).key
+        if unverified_header.get("alg") != self.token_alg:
+            raise AuthenticationError(
+                f"Unexpected token alg: {unverified_header.get('alg')}, expected: {self.token_alg}"
+            )
+        signing_key = self.jwks_client.get_signing_key_from_jwt(access_token).key
+
         try:
             # Decode and validate the token
             valid_decoded_token = jwt.decode(  # type: ignore
                 jwt=access_token,
                 key=signing_key,
-                algorithms=[alg],
+                algorithms=[self.token_alg],
                 audience=self.audience,
                 issuer=self.issuer,
                 options={"verify_aud": True, "verify_iss": True},
@@ -251,10 +251,16 @@ class Authenticator(AuthenticatorProtocol):
             )
         except jwt.ExpiredSignatureError as e:
             logger.error("Token has expired")
-            raise e
+            raise AuthenticationError("Token has expired") from e
+        except jwt.InvalidAudienceError as e:
+            logger.error("Invalid audience in token")
+            raise AuthenticationError("Invalid audience in token") from e
+        except jwt.InvalidIssuerError as e:
+            logger.error("Invalid issuer in token")
+            raise AuthenticationError("Invalid issuer in token") from e
         except Exception as e:
             logger.error(f"Invalid token or other error: {e}")
-            raise e
+            raise AuthenticationError(f"Invalid token or other error: {e}") from e
 
     async def _request_token(
         self,
@@ -320,7 +326,7 @@ class Authenticator(AuthenticatorProtocol):
                 )
 
             # Get authorization code
-            logger.info(f"Received OAuth callback: {request.query!r}")
+            logger.info(f"Received OAuth callback")
             authorization_code = request.query.get("code")
             if not authorization_code:
                 error_message = "No authorization code received"
@@ -379,7 +385,7 @@ class Authenticator(AuthenticatorProtocol):
         The URL for the user to visit to authorize the application, along with the state
         value to use for CSRF protection.
         """
-        state = "".join(choices(string.ascii_letters + string.digits, k=16))
+        state = generate_secure_random_string(16)
         if scopes is None:
             scopes = self.scopes
         query_params = {
@@ -394,10 +400,10 @@ class Authenticator(AuthenticatorProtocol):
         query_string = urlencode(query_params)
         return (f"{self.authorization_endpoint}?{query_string}", state)
 
-    def _generate_code_challenge_and_verifier(self) -> tuple[str, str]:
-        """Generate a code challenge and code verifier for PKCE."""
-        code_verifier = base64.urlsafe_b64encode(secrets.token_bytes(32))
-        sha256 = hashlib.sha256()
-        sha256.update(code_verifier)
-        code_challenge = base64.urlsafe_b64encode(sha256.digest()).decode().rstrip("=")
-        return code_challenge, code_verifier.decode()
+    # def _generate_code_challenge_and_verifier(self) -> tuple[str, str]:
+    #     """Generate a code challenge and code verifier for PKCE."""
+    #     code_verifier = base64.urlsafe_b64encode(secrets.token_bytes(32))
+    #     sha256 = hashlib.sha256()
+    #     sha256.update(code_verifier)
+    #     code_challenge = base64.urlsafe_b64encode(sha256.digest()).decode().rstrip("=")
+    #     return code_challenge, code_verifier.decode()

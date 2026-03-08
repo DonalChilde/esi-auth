@@ -13,7 +13,6 @@ from esi_auth.cli.helpers import (
     EsiAuthSettings,
     config_authenticator,
 )
-from esi_auth.models import CharacterToken
 from esi_auth.settings import USER_AGENT
 from esi_auth.simple_json_store import CharacterTokenManager
 
@@ -126,13 +125,13 @@ def remove(
 
     try:
         token = asyncio.run(token_manager.get_token(character_id, min_seconds=-1))
-        token_manager.remove_token(character_id)
 
         async def revoke():
             async with aiohttp.ClientSession() as session:
                 await authenticator.revoke_character_token(token, session)
 
         asyncio.run(revoke())
+        token_manager.remove_token(character_id)
         console.print(f"Token for character ID {character_id} removed successfully.\n")
     except KeyError as e:
         console.print(f"[red]No token found for character ID {character_id}[/red]\n")

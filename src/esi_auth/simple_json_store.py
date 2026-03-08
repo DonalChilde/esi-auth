@@ -7,10 +7,9 @@ import asyncio
 from pathlib import Path
 
 import aiohttp
-from whenever import Instant
 
-from esi_auth.authenticate_esi import request_refreshed_token
-from esi_auth.models import CharacterToken, OauthToken
+from esi_auth.authenticator import Authenticator
+from esi_auth.models import CharacterToken
 from esi_auth.protocols import (
     CharacterTokenManagerProtocol,
     CharacterTokenProviderProtocol,
@@ -27,6 +26,7 @@ class CharacterTokenProvider(CharacterTokenProviderProtocol):
     def __init__(
         self,
         tokens_dir: Path,
+        authenticator: Authenticator,
         token_endpoint: str = DEFAULT_OAUTH_SETTINGS.token_endpoint,
         user_agent: str = USER_AGENT,
     ):
@@ -34,10 +34,12 @@ class CharacterTokenProvider(CharacterTokenProviderProtocol):
 
         Args:
             tokens_dir: The directory where token JSON files are stored.
+            authenticator: The Authenticator instance to use for refreshing tokens.
             token_endpoint: The OAuth token endpoint.
             user_agent: The user agent to use for HTTP requests.
         """
         self.tokens_dir = tokens_dir
+        self.authenticator = authenticator
         self.token_endpoint = token_endpoint
         self.user_agent = user_agent
 
@@ -68,27 +70,6 @@ class CharacterTokenProvider(CharacterTokenProviderProtocol):
         file_path.parent.mkdir(parents=True, exist_ok=True)
         file_path.write_text(token.model_dump_json(indent=2))
 
-    async def _refresh_token(
-        self, token: CharacterToken, client_session: aiohttp.ClientSession
-    ) -> CharacterToken:
-        """Refresh the given token and return the new token."""
-        json_oauth_token = await request_refreshed_token(
-            refresh_token=token.oauth_token.refresh_token,
-            client_id=token.client_id,
-            token_endpoint=self.token_endpoint,
-            user_agent=self.user_agent,
-            client_session=client_session,
-        )
-        oauth_token = OauthToken.model_validate(json_oauth_token)
-        new_token = CharacterToken(
-            character_id=token.character_id,
-            character_name=token.character_name,
-            client_id=token.client_id,
-            oauth_token=oauth_token,
-            refreshed_at=Instant.now().timestamp(),
-        )
-        return new_token
-
     async def get_token(
         self, character_id: int, min_seconds: int = 300
     ) -> CharacterToken:
@@ -114,7 +95,9 @@ class CharacterTokenProvider(CharacterTokenProviderProtocol):
 
             async def refresh(token: CharacterToken) -> CharacterToken:
                 async with aiohttp.ClientSession() as session:
-                    new_token = await self._refresh_token(token, session)
+                    new_token = await self.authenticator.refresh_character_token(
+                        token, session
+                    )
                 return new_token
 
             new_token = await refresh(token)
@@ -144,7 +127,10 @@ class CharacterTokenProvider(CharacterTokenProviderProtocol):
         async def refresh_all(tokens: list[CharacterToken]) -> list[CharacterToken]:
             async with aiohttp.ClientSession() as session:
                 refreshed_tokens = await asyncio.gather(
-                    *(self._refresh_token(token, session) for token in tokens)
+                    *(
+                        self.authenticator.refresh_character_token(token, session)
+                        for token in tokens
+                    )
                 )
             return refreshed_tokens
 

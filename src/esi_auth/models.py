@@ -1,6 +1,7 @@
 """Models for ESI Auth."""
 
 from dataclasses import dataclass
+from typing import TypedDict
 
 from pydantic import BaseModel, ConfigDict
 from whenever import Instant
@@ -22,6 +23,23 @@ class OauthToken:
     token_type: str
     expires_in: int
     refresh_token: str
+
+
+class OauthMetadata(TypedDict):
+    """OAuth2 server metadata from well-known endpoint."""
+
+    issuer: str
+    authorization_endpoint: str
+    token_endpoint: str
+    response_types_supported: list[str]
+    jwks_uri: str
+    revocation_endpoint: str
+    subject_types_supported: list[str]
+    revocation_endpoint_auth_methods_supported: list[str]
+    token_endpoint_auth_methods_supported: list[str]
+    id_token_signing_alg_values_supported: list[str]
+    token_endpoint_auth_signing_alg_values_supported: list[str]
+    code_challenge_methods_supported: list[str]
 
 
 class EveAppCredentials(BaseModel):

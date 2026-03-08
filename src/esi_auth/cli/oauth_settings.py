@@ -1,3 +1,5 @@
+"""Commands for managing OAuth settings, including fetching from the ESI auth server and displaying the current settings."""
+
 import asyncio
 import json
 from typing import Any, cast
@@ -7,7 +9,7 @@ import typer
 from rich.console import Console
 from rich.json import JSON
 
-from esi_auth.cli.helpers import EsiAuthSettings
+from esi_auth.cli.helpers import EsiAuthSettings, load_oauth_metadata
 
 app = typer.Typer(no_args_is_help=True)
 
@@ -18,17 +20,14 @@ def show(ctx: typer.Context):
     settings = ctx.obj["esi-auth-settings"]
     settings = cast(EsiAuthSettings, settings)
     console = Console()
-    oauth_path = settings.oauth_settings_file
-    if oauth_path.exists():
-        console.print(f"OAuth settings file found at {oauth_path}")
-        console.print(JSON(oauth_path.read_text()))
-    else:
-        console.print(f"OAuth settings file not found at {oauth_path}")
+    oauth_metadata = load_oauth_metadata(settings, console)
+    console.print(f"OAuth metadata loaded from {settings.oauth_settings_file}:")
+    console.print(JSON.from_data(oauth_metadata, indent=2))
 
 
 @app.command()
 def fetch(ctx: typer.Context):
-    """Fetch the current OAuth settings from the ESI auth server and save them to the settings file."""
+    """Fetch the current OAuth settings from the ESI auth server and save them to the settings filepath."""
     settings = ctx.obj["esi-auth-settings"]
     settings = cast(EsiAuthSettings, settings)
     console = Console()

@@ -6,8 +6,8 @@ import hashlib
 import logging
 import secrets
 import string
-from collections.abc import Sequence
 from random import choices
+from typing import Self
 from urllib.parse import urlencode, urlparse
 
 import aiohttp
@@ -15,7 +15,13 @@ import jwt
 from aiohttp import web
 from jwt.jwks_client import PyJWKClient
 
-from esi_auth.models import CharacterToken, OauthToken, RequestParams, ValidatedToken
+from esi_auth.models import (
+    CharacterToken,
+    OauthMetadata,
+    OauthToken,
+    RequestParams,
+    ValidatedToken,
+)
 from esi_auth.protocols import AuthenticatorProtocol
 from esi_auth.settings import USER_AGENT
 
@@ -59,7 +65,7 @@ class Authenticator(AuthenticatorProtocol):
         token_endpoint: str = "https://login.eveonline.com/v2/oauth/token",
         jwks_uri: str = "https://login.eveonline.com/oauth/jwks",
         revocation_endpoint: str = "https://login.eveonline.com/v2/oauth/revoke",
-        issuers: Sequence[str] = ("https://login.eveonline.com",),
+        issuer: str = "https://login.eveonline.com",
     ) -> None:
         self.metadata_endpoint = metadata_endpoint
         self.authorization_endpoint = authorization_endpoint
@@ -67,20 +73,24 @@ class Authenticator(AuthenticatorProtocol):
         self.jwks_uri = jwks_uri
         self.revocation_endpoint = revocation_endpoint
         self.audience = audience
-        self.issuers = list(issuers)
+        self.issuer = issuer
         self.client_id = client_id
         self.scopes = scopes
         self.callback_url = callback_url
         self.jwks_client = None  # This will be initialized on the first token request
 
-    async def request_character_token(self, params: RequestParams) -> CharacterToken:
+    async def request_character_token(
+        self, params: RequestParams, timeout: int = 300
+    ) -> CharacterToken:
         """Request a new ESI token.
 
         Runs the server, gets the token, validates it, and returns the character information.
 
         This method should be implemented by subclasses to provide the actual logic for requesting a new token.
         """
-        authorization_code = await self._run_callback_server(params.state, timeout=300)
+        authorization_code = await self._run_callback_server(
+            params.state, timeout=timeout
+        )
         async with aiohttp.ClientSession() as client_session:
             oauth_token = await self._request_token(
                 authorization_code, params.code_verifier, client_session
@@ -156,6 +166,44 @@ class Authenticator(AuthenticatorProtocol):
             code_challenge=code_challenge,
         )
 
+    @classmethod
+    def from_dict(
+        cls,
+        client_id: str,
+        scopes: list[str],
+        callback_url: str,
+        config_dict: OauthMetadata,
+    ) -> Self:
+        """Create an Authenticator instance from a dictionary of parameters."""
+        return cls(
+            client_id=client_id,
+            scopes=scopes,
+            callback_url=callback_url,
+            authorization_endpoint=config_dict["authorization_endpoint"],
+            token_endpoint=config_dict["token_endpoint"],
+            jwks_uri=config_dict["jwks_uri"],
+            revocation_endpoint=config_dict["revocation_endpoint"],
+            issuer=config_dict["issuer"],
+        )
+
+    @classmethod
+    async def from_metadata_endpoint(
+        cls,
+        client_id: str,
+        scopes: list[str],
+        callback_url: str,
+        metadata_endpoint: str = "https://login.eveonline.com/.well-known/oauth-authorization-server",
+    ) -> Self:
+        """Create an Authenticator instance by fetching the OAuth metadata from the specified endpoint."""
+        async with aiohttp.ClientSession() as client_session:
+            async with client_session.get(
+                metadata_endpoint, headers={"User-Agent": USER_AGENT}
+            ) as response:
+                response.raise_for_status()
+                metadata = await response.json()
+                config_dict = OauthMetadata(**metadata)
+                return cls.from_dict(client_id, scopes, callback_url, config_dict)
+
     def _create_character_token(
         self, validated_token: ValidatedToken, oauth_token: OauthToken
     ) -> CharacterToken:
@@ -189,7 +237,7 @@ class Authenticator(AuthenticatorProtocol):
                 key=signing_key,
                 algorithms=[alg],
                 audience=self.audience,
-                issuer=self.issuers,
+                issuer=self.issuer,
                 options={"verify_aud": True, "verify_iss": True},
             )
             character_id = valid_decoded_token["sub"].split(":")[-1]

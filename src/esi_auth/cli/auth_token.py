@@ -1,16 +1,19 @@
 """CLI commands for managing CharacterTokens."""
 
 import asyncio
-from typing import Annotated, cast
+from typing import Annotated, Any, cast
 
 import aiohttp
 import typer
 from rich.console import Console
+from rich.json import JSON
 
 from esi_auth.cli.helpers import (
     EsiAuthSettings,
     config_authenticator,
 )
+from esi_auth.models import CharacterToken
+from esi_auth.settings import USER_AGENT
 from esi_auth.simple_json_store import CharacterTokenManager
 
 app = typer.Typer(no_args_is_help=True)
@@ -19,6 +22,14 @@ app = typer.Typer(no_args_is_help=True)
 @app.command()
 def add(
     ctx: typer.Context,
+    test_token: Annotated[
+        bool,
+        typer.Option(
+            "-t",
+            "--test-token",
+            help="Make a resquest to the EVE ESI to proven token is working",
+        ),
+    ] = False,
 ):
     """Add a new CharacterToken."""
     settings = ctx.obj["esi-auth-settings"]
@@ -55,6 +66,15 @@ def add(
         console.print(f"[red]Error saving token: {e}[/red]\n")
         raise typer.Exit(code=1) from e
     console.print(f"Token for {character_token.character_name} added successfully.\n")
+    if test_token:
+        console.print(f"Testing token by fetching character attributes from ESI...\n")
+        try:
+            attributes = asyncio.run(get_character_attributes(character_token))
+            console.print(f"Token is valid. Character attributes:")
+            console.print(JSON.from_data(attributes))
+        except Exception as e:
+            console.print(f"[red]Error testing token: {e}[/red]\n")
+            raise typer.Exit(code=1) from e
 
 
 @app.command()
@@ -178,3 +198,20 @@ def refresh_all(
     except Exception as e:
         console.print(f"[red]Error refreshing tokens: {e}[/red]\n")
         raise typer.Exit(code=1) from e
+
+
+async def get_character_attributes(token: CharacterToken) -> dict[str, Any]:
+    """Get character attributes from ESI using the token."""
+    async with aiohttp.ClientSession() as session:
+        headers: dict[str, str] = {
+            "Authorization": f"Bearer {token.oauth_token.access_token}",
+            "User-Agent": USER_AGENT,
+        }
+        url = f"https://esi.evetech.net/characters/{token.character_id}/attributes"
+        async with session.get(url, headers=headers) as response:
+            if response.status != 200:
+                raise Exception(
+                    f"Failed to get character attributes: {response.status} {response.reason}"
+                )
+            data = await response.json()
+            return data

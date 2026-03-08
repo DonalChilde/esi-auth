@@ -8,6 +8,7 @@ import typer
 from rich.console import Console
 from rich.json import JSON
 
+from esi_auth.auth_provider import AuthProvider
 from esi_auth.cli.helpers import (
     EsiAuthSettings,
     config_authenticator,
@@ -69,7 +70,9 @@ def add(
     if test_token:
         console.print(f"Testing token by fetching character attributes from ESI...\n")
         try:
-            attributes = asyncio.run(get_character_attributes(character_token))
+            attributes = asyncio.run(
+                get_character_attributes(character_token.character_id, token_manager)
+            )
             console.print(f"Token is valid. Character attributes:")
             console.print(JSON.from_data(attributes))
         except Exception as e:
@@ -200,14 +203,22 @@ def refresh_all(
         raise typer.Exit(code=1) from e
 
 
-async def get_character_attributes(token: CharacterToken) -> dict[str, Any]:
-    """Get character attributes from ESI using the token."""
+async def get_character_attributes(
+    character_id: int, token_manager: CharacterTokenManager
+) -> dict[str, Any]:
+    """Get character attributes from ESI using the token.
+
+    Demonstrates use of the AuthProvider and CharacterTokenManager to get a valid token
+    and make an authenticated request to ESI.
+    """
+    auth_provider = AuthProvider(token_manager)
+    character_auth = await auth_provider.character_auth(character_id)
     async with aiohttp.ClientSession() as session:
         headers: dict[str, str] = {
-            "Authorization": f"Bearer {token.oauth_token.access_token}",
             "User-Agent": USER_AGENT,
         }
-        url = f"https://esi.evetech.net/characters/{token.character_id}/attributes"
+        headers.update(character_auth.auth_headers)
+        url = f"https://esi.evetech.net/characters/{character_id}/attributes"
         async with session.get(url, headers=headers) as response:
             if response.status != 200:
                 raise Exception(

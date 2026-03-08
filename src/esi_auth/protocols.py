@@ -118,6 +118,6 @@ class AuthProviderProtocol(Protocol):
         """
         ...
 
-    def available_characters(self) -> list[int]:
+    async def available_characters(self) -> list[int]:
         """Return a list of character IDs for which authentication information is available."""
         ...

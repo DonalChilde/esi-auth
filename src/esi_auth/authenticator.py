@@ -1,3 +1,5 @@
+"""Authenticator class for handling ESI SSO authentication flows."""
+
 import asyncio
 import base64
 import hashlib

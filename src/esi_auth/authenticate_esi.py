@@ -120,7 +120,7 @@ class OauthMetadata(TypedDict):
     code_challenge_methods_supported: list[str]
 
 
-class OauthToken(TypedDict):
+class OauthTokenDict(TypedDict):
     """OAuth2 token response structure."""
 
     access_token: str
@@ -203,7 +203,7 @@ async def request_token(
     token_endpoint: str,
     user_agent: str,
     client_session: aiohttp.ClientSession,
-) -> OauthToken:
+) -> OauthTokenDict:
     """Takes an authorization code and code verifier and exchanges it for an access token and refresh token.
 
     Args:
@@ -246,7 +246,7 @@ async def request_refreshed_token(
     token_endpoint: str,
     user_agent: str,
     client_session: aiohttp.ClientSession,
-) -> OauthToken:
+) -> OauthTokenDict:
     """Takes a refresh token and exchanges it for a new access token and refresh token.
 
     Args:
@@ -574,7 +574,7 @@ async def get_token_flow(
     client_session: aiohttp.ClientSession,
     user_agent: str,
     callback_url: str,
-) -> OauthToken:
+) -> OauthTokenDict:
     """Run the full OAuth2 authorization code flow to get an access token.
 
     Shown as an example of how to use the helper functions together.

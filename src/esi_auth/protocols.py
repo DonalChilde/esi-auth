@@ -2,7 +2,9 @@
 
 from typing import Protocol
 
-from esi_auth.models import CharacterAuth, CharacterToken
+import aiohttp
+
+from esi_auth.models import CharacterAuth, CharacterToken, RequestParams
 
 
 class CharacterTokenProviderProtocol(Protocol):
@@ -75,4 +77,43 @@ class AuthProviderProtocol(Protocol):
 
     def available_characters(self) -> list[int]:
         """Return a list of character IDs for which authentication information is available."""
+        ...
+
+
+class AuthenticatorProtocol(Protocol):
+    """Protocol for authenticating ESI tokens."""
+
+    async def request_character_token(self, params: RequestParams) -> CharacterToken:
+        """Request a new ESI token.
+
+        Runs the server, gets the token, validates it, and returns the character information.
+
+        This method should be implemented by subclasses to provide the actual logic for requesting a new token.
+        """
+        ...
+
+    async def refresh_character_token(
+        self, token: CharacterToken, client_session: aiohttp.ClientSession
+    ) -> CharacterToken:
+        """Refresh an existing ESI token.
+
+        Returns a new CharacterToken with updated auth token information.
+        """
+        ...
+
+    async def revoke_character_token(
+        self, token: CharacterToken, client_session: aiohttp.ClientSession
+    ) -> None:
+        """Revoke an existing ESI token.
+
+        Raises:
+
+        """
+        ...
+
+    def prepare_for_request(self, scopes: list[str] | None = None) -> RequestParams:
+        """Prepare the authenticator for making requests.
+
+        This method can be used to initialize any necessary state or perform any necessary setup before making requests.
+        """
         ...

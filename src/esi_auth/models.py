@@ -16,13 +16,12 @@ class CharacterAuth:
     expires_at: int
 
 
-class OauthToken(BaseModel):
+@dataclass(slots=True, frozen=True)
+class OauthToken:
     access_token: str
     token_type: str
     expires_in: int
     refresh_token: str
-
-    model_config = ConfigDict(frozen=True)
 
 
 class EveAppCredentials(BaseModel):
@@ -45,21 +44,32 @@ class EveAppCredentials(BaseModel):
 class CharacterToken(BaseModel):
     character_id: int
     character_name: str
-    client_id: str
-    refreshed_at: int
+    created: int
+    expires: int
     oauth_token: OauthToken
 
     model_config = ConfigDict(frozen=True)
 
     @property
-    def expires_at(self) -> int:
-        """Return the timestamp when the token expires."""
-        return self.refreshed_at + self.oauth_token.expires_in
-
-    @property
     def expires_in(self) -> int:
         """Return the number of seconds until the token expires."""
-        return self.expires_at - Instant.now().timestamp()
+        return self.expires - Instant.now().timestamp()
+
+
+@dataclass(slots=True, frozen=True)
+class RequestParams:
+    url: str
+    state: str
+    code_verifier: str
+    code_challenge: str
+
+
+@dataclass(slots=True, frozen=True)
+class ValidatedToken:
+    character_id: int
+    character_name: str
+    created_at: int
+    expires_at: int
 
 
 # class AppCredentials(BaseModel):

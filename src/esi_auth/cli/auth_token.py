@@ -109,6 +109,36 @@ def list(
 
 
 @app.command()
+def auth_headers(
+    ctx: typer.Context,
+    character_id: Annotated[
+        int, typer.Argument(help="ID of the character token to show auth headers for.")
+    ],
+):
+    """Show the auth headers for a CharacterToken by character ID."""
+    settings = ctx.obj["esi-auth-settings"]
+    settings = cast(EsiAuthSettings, settings)
+    console = Console()
+    authenticator = config_authenticator(settings, console)
+    token_manager = CharacterTokenManager(settings.tokens_dir, authenticator)
+
+    try:
+        token = asyncio.run(token_manager.get_token(character_id, min_seconds=-1))
+        console.print(
+            f"Auth headers for {token.character_name} (ID: {token.character_id}):\n"
+        )
+        console.print(
+            f"{{'Authorization': 'Bearer {token.oauth_token.access_token}'}}\n"
+        )
+    except KeyError as e:
+        console.print(f"[red]No token found for character ID {character_id}[/red]\n")
+        raise typer.Exit(code=1) from e
+    except Exception as e:
+        console.print(f"[red]Error getting token: {e}[/red]\n")
+        raise typer.Exit(code=1) from e
+
+
+@app.command()
 def remove(
     ctx: typer.Context,
     character_id: Annotated[

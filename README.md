@@ -20,29 +20,32 @@ First, create an EVE Online application at [EVE Developers](https://developers.e
 
 ### 2. Setup the Environment
 
-On first run (try `esi-auth version`), esi-auth will create a directory in the default application location as defined by Typer. This directory will contain the program logs, the .env configuation file, and the auth store data file.
+On first run (try `esi-auth version`), esi-auth will create a directory in the default application location as defined by Typer. This directory will contain the program logs and data files.
+### 3. Add your app credentials to esi-auth
 
-### 3. Add your credentials to esi-auth
+Add your credentials to esi-auth by running `esi-auth creds add <path-to-credentials-file>`
 
-Add your credentials to esi-auth by running `esi-auth credentials add <path-to-credentials-file>`
+Credentials must be in json format. 
 
-For convenience, you can supply an alias for you credentials. If no alias is provided, one will be generated from your app name. Aliases and client_id's must be unique within each auth store file.
 
-e.g. `esi-auth credentials add <path-to-credentials-file> -a <short-unique-name-for-your-app>`
-
-Credentials can be retrieved later either by client_id, or alias.
 
 ### 4. Authenticate Your First Character
 
-From the terminal, run `esi-auth tokens add -i <client_id>` or `esi-auth tokens add -a <your-app-alias>`
+From the terminal, run `esi-auth tokens add` 
 
-This should open your default browser to the Eve login page.
+Click on the link in the terminal window, or copy and paste the url into your web browser.
 
-If it does not, you can either click on the link in the terminal, or see the logs for the url which you can copy and paste into your web browser. If you get a page noit found error for your callback page, try reloading the page. Sometimes the server takes a tick to load up.
+Log into EVE Online, select your character, and approve the list of scopes.
+
+You can use the `-t` flag to make a test request to the EVE Esi, assuming your app includes the `esi-skills.read_skills.v1` scope.
+
+
 
 ## API Usage
 
-The primary path for auth store modification should be through the esi-auth CLI. For access to the CharacterTokens from a third party app, that app can use the TokenManager object. This allows a third party app to get a copy of all the tokens for a particular client alias. Each time tokens are requested, the store file will be loaded, and the tokens checked for refresh.
+This app will normally be used from inside another app, such as esi-link, which will make use of the authenticated tokens. The cli is designed such that the commands should be easy to add on to another typer based project if desired.
+
+TODO more explicit integration examples.
 
 ## Installation
 
@@ -94,20 +97,7 @@ esi-auth = { git = "https://github.com/DonalChilde/esi-auth", branch = "main" }
 
 ### ruff settings for formatting and linting
 
-```toml
-[tool.ruff.lint]
-select = ["B", "UP", "D", "DOC", "FIX", "I", "F401"]
-# non-imperative-mood (D401)
-ignore = ["D401", "D101"]
-# extend-select = ["I"]
-
-[tool.ruff.lint.pydocstyle]
-convention = "google"
-
-[tool.ruff.format]
-docstring-code-format = true
-docstring-code-line-length = 88
-```
+See the pyproject.toml file
 
 ## Contributing
 
